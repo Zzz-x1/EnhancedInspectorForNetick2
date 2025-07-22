@@ -23,8 +23,7 @@ namespace Cjx.Unity.Netick.Editor
             EditorApplication.delayCall += Init;
         }
 
-        [MenuItem("Tool/InitEditor")]
-        public static void Init()
+        static void Init()
         {
             var o = typeof(Editor).Assembly.GetType("UnityEditor.CustomEditorAttributes");//
             var dictField = o.GetField("kSCustomEditors", BindingFlags.Static | BindingFlags.NonPublic);
@@ -59,8 +58,6 @@ namespace Cjx.Unity.Netick.Editor
 
     public class MyEditor : Editor
     {
-        ScriptableObject proxy;
-
         EditorApplication.CallbackFunction update;
 
         public unsafe override VisualElement CreateInspectorGUI()
@@ -94,10 +91,6 @@ namespace Cjx.Unity.Netick.Editor
 
         private void OnDestroy()
         {
-            if (proxy)
-            {
-                DestroyImmediate(proxy);
-            }
             if (update != null)
             {
                 EditorApplication.update -= update;
@@ -112,7 +105,6 @@ namespace Cjx.Unity.Netick.Editor
 
         public static VisualElement Configure(Type type, Func<object> targetGet, ref Action update)
         {
-            // closure
             object source = null;
 
             update += () =>
