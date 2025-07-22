@@ -24,6 +24,36 @@ namespace Cjx.Unity.Netick.Editor
 
         static void Init()
         {
+#if UNITY_6000_0_OR_NEWER
+            Init_6X();
+#else
+            Init_2022_X();
+#endif
+        }
+
+        private static void Init_6X()
+        {
+            var o = typeof(Editor).Assembly.GetType("UnityEditor.CustomEditorAttributes");//
+            var instanceGet = o.GetProperty("instance", BindingFlags.Static | BindingFlags.NonPublic);
+            var instance = instanceGet.GetValue(null);
+            var cache = instance.GetType().GetField("m_Cache", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(instance);
+            var dictField = cache.GetType().GetField("m_CustomEditorCache", BindingFlags.Instance | BindingFlags.NonPublic);
+            var dict = dictField.GetValue(cache);
+            var storage = Activator.CreateInstance(dict.GetType().GetGenericArguments()[1]);
+            var lsField = storage.GetType().GetField("customEditors");
+            var lsType = lsField.FieldType;
+            var lsInst = Activator.CreateInstance(lsType);
+            lsField.SetValue(storage, lsInst);
+            var monoEditorInst = Activator.CreateInstance(lsType.GetGenericArguments()[0], new object[] { typeof(MyEditor), null, true, false });
+            lsType.GetMethod("Add").Invoke(lsInst, new[] { monoEditorInst });
+            var addMd = dictField.FieldType.GetMethod("Add");
+            var removeMd = dictField.FieldType.GetMethods().FirstOrDefault(x => x.Name == "Remove" && x.GetParameters().Length == 1);
+            removeMd.Invoke(dict, new[] { typeof(NetworkBehaviour) });
+            addMd.Invoke(dict, new object[] { typeof(NetworkBehaviour), storage });
+        }
+
+        private static void Init_2022_X()
+        {
             var o = typeof(Editor).Assembly.GetType("UnityEditor.CustomEditorAttributes");//
             var dictField = o.GetField("kSCustomEditors", BindingFlags.Static | BindingFlags.NonPublic);
             var dict = dictField.GetValue(null);
@@ -61,31 +91,28 @@ namespace Cjx.Unity.Netick.Editor
 
         public unsafe override VisualElement CreateInspectorGUI()
         {
-            if (((NetworkBehaviour)target).StatePtr == null)
-            {
-                var root = new VisualElement();
-                InspectorElement.FillDefaultInspector(root, serializedObject, this);
-                return root;
-            }
-            else
-            {
-                var root = new VisualElement();
-                var foldOut = new Foldout();
-                foldOut.value = false;
-                foldOut.text = "Debug";
-                Action update = null;
-                var content = EditorEx.Configure(target.GetType(), () => target, ref update);
-                foldOut.Add(content);
 
-                var defaultIsp = new VisualElement();
-                InspectorElement.FillDefaultInspector(defaultIsp, serializedObject, this);
-                root.Add(defaultIsp);
-                root.Add(foldOut);
-                this.update = () => update();
-                EditorApplication.update += this.update;
-                return root;//
-            }
+            var root = new VisualElement();
+            InspectorElement.FillDefaultInspector(root, serializedObject, this);
 
+            if (((NetworkBehaviour)target).StatePtr != null)
+            {
+                CreateDebugEditor(root);
+            }
+            return root;
+        }
+
+        private void CreateDebugEditor(VisualElement root)
+        {
+            var foldOut = new Foldout();
+            foldOut.value = false;
+            foldOut.text = "Debug";
+            Action update = null;
+            var content = EditorEx.Configure(target.GetType(), () => target, ref update);
+            foldOut.Add(content);
+            root.Add(foldOut);
+            this.update = () => update();
+            EditorApplication.update += this.update;
         }
 
         private void OnDestroy()
