@@ -5,7 +5,9 @@ using System.Linq;
 using System.Reflection;
 using Netick;
 using Netick.Unity;
+using NetickEditor;
 using UnityEditor;
+using UnityEditor.Callbacks;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -85,7 +87,7 @@ namespace Cjx.Unity.Netick.Editor
         }
     }
 
-    internal class MyEditor : Editor
+    internal class MyEditor : NetworkBehaviourEditor
     {
         EditorApplication.CallbackFunction update;
 
@@ -93,7 +95,10 @@ namespace Cjx.Unity.Netick.Editor
         {
 
             var root = new VisualElement();
-            InspectorElement.FillDefaultInspector(root, serializedObject, this);
+            //InspectorElement.FillDefaultInspector(root, serializedObject, this);
+
+            var defaultImpl = new IMGUIContainer(() => base.OnInspectorGUI());
+            root.Add(defaultImpl);
 
             if (((NetworkBehaviour)target).StatePtr != null)
             {
@@ -270,6 +275,14 @@ namespace Cjx.Unity.Netick.Editor
                 else if (type == typeof(NetworkBool))
                 {
                     ConfigureField<Toggle, bool>(root, name, ()=> (bool)(NetworkBool)getValue(), ref update);
+                }
+                else if (type == typeof(Quaternion))
+                {
+                    ConfigureField<Vector4Field, Vector4>(root, name, () => {
+                        var raw = (Quaternion)getValue();
+                        return new Vector4(raw.x,raw.y,raw.z,raw.w);
+                    }, ref update);
+                    ConfigureField<Vector3Field, Vector3>(root, name + ".eulerAngles", () => ((Quaternion)getValue()).eulerAngles, ref update);
                 }
                 else if (type.IsEnum)
                 {
