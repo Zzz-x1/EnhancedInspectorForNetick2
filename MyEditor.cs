@@ -17,7 +17,6 @@ namespace Cjx.Unity.Netick.Editor
     [InitializeOnLoad]
     internal static class Entry
     {
-
         static Entry()
         {
             EditorApplication.delayCall += Init;
@@ -56,7 +55,7 @@ namespace Cjx.Unity.Netick.Editor
         }
     }
 
-    public class MyEditor : Editor
+    internal class MyEditor : Editor
     {
         EditorApplication.CallbackFunction update;
 
@@ -103,6 +102,8 @@ namespace Cjx.Unity.Netick.Editor
 
         static BindingFlags All = BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic;
 
+        static MethodInfo configureStyleMethod = typeof(PropertyField).GetMethod("ConfigureFieldStyles",BindingFlags.Static | BindingFlags.NonPublic);
+
         public static VisualElement Configure(Type type, Func<object> targetGet, ref Action update)
         {
             object source = null;
@@ -144,7 +145,7 @@ namespace Cjx.Unity.Netick.Editor
             return root;
         }
 
-        static void ConfigField<TField, TValue>(VisualElement root, string name, Func<object> getValue, ref Action update) where TField : BaseField<TValue>, new()
+        static TField ConfigureField<TField, TValue>(VisualElement root, string name, Func<object> getValue, ref Action update) where TField : BaseField<TValue>, new()
         {
             var fd = new TField();
             fd.label = name;
@@ -153,161 +154,112 @@ namespace Cjx.Unity.Netick.Editor
             {
                 fd.value = (TValue)getValue();
             };
+            fd.SetEnabled(false);
+            ConfigureStyle<TField,TValue>(fd);
+            return fd;
+        }
+
+        static void ConfigureStyle<TField,TValue>(TField field)
+        {
+            configureStyleMethod.MakeGenericMethod(typeof(TField),typeof(TValue)).Invoke(null, new object[] { field });
         }
 
         static void AddDisplayItem(VisualElement root, string name, Type type, Func<object> getValue, ref Action update)
         {
             if (type.IsValueType)
             {
-                if (type == typeof(int) || type == typeof(short))
+                if (type == typeof(int))
                 {
-                    var fd = new IntegerField();
-                    fd.label = name;
-                    root.Add(fd);
-                    if (type == typeof(short))
-                    {
-                        update += () =>
-                        {
-                            fd.value = (short)getValue();
-                        };
-
-                    }
-                    else
-                    {
-                        update += () =>
-                        {
-                            fd.value = (int)getValue();
-                        };
-                    }
-
+                    ConfigureField<IntegerField,int>(root, name, getValue, ref update);
                 }
-                else if (type == typeof(uint) || type == typeof(ushort))
+                else if (type == typeof(short))
                 {
-                    var fd = new UnsignedIntegerField();
-                    fd.label = name;
-                    root.Add(fd);
-                    if (type == typeof(ushort))
-                    {
-                        update += () =>
-                        {
-                            fd.value = (ushort)getValue();
-                        };
-
-                    }
-                    else
-                    {
-                        update += () =>
-                        {
-                            fd.value = (uint)getValue();
-                        };
-                    }
-
+                    ConfigureField<IntegerField, int>(root, name, () => (int)(short)getValue(), ref update);
+                }
+                else if (type == typeof(uint))
+                {
+                    ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)getValue(), ref update);
+                }
+                else if (type == typeof(ushort))
+                {
+                    ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)(ushort)getValue(), ref update);
                 }
                 else if (type == typeof(long))
                 {
-                    ConfigField<LongField, long>(root, name, getValue, ref update);
+                    ConfigureField<LongField, long>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(ulong))
                 {
-                    ConfigField<UnsignedLongField, ulong>(root, name, getValue, ref update);
+                    ConfigureField<UnsignedLongField, ulong>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(float))
                 {
-                    ConfigField<FloatField, float>(root, name, getValue, ref update);
+                    ConfigureField<FloatField, float>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(double))
                 {
-                    ConfigField<DoubleField, double>(root, name, getValue, ref update);
+                    ConfigureField<DoubleField, double>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Vector3))
                 {
-                    ConfigField<Vector3Field, Vector3>(root, name, getValue, ref update);
+                    ConfigureField<Vector3Field, Vector3>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Vector3Int))
                 {
-                    ConfigField<Vector3IntField, Vector3Int>(root, name, getValue, ref update);
+                    ConfigureField<Vector3IntField, Vector3Int>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Vector2Int))
                 {
-                    ConfigField<Vector2IntField, Vector2Int>(root, name, getValue, ref update);
+                    ConfigureField<Vector2IntField, Vector2Int>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Vector2))
                 {
-                    ConfigField<Vector2Field, Vector2>(root, name, getValue, ref update);
+                    ConfigureField<Vector2Field, Vector2>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Vector4))
                 {
-                    ConfigField<Vector4Field, Vector4>(root, name, getValue, ref update);
+                    ConfigureField<Vector4Field, Vector4>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Color))
                 {
-                    ConfigField<ColorField, Color>(root, name, getValue, ref update);
+                    ConfigureField<ColorField, Color>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Rect))
                 {
-                    ConfigField<RectField, Rect>(root, name, getValue, ref update);
+                    ConfigureField<RectField, Rect>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Bounds))
                 {
-                    ConfigField<BoundsField, Bounds>(root, name, getValue, ref update);
+                    ConfigureField<BoundsField, Bounds>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(Hash128))
                 {
-                    ConfigField<Hash128Field, Hash128>(root, name, getValue, ref update);
+                    ConfigureField<Hash128Field, Hash128>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(bool))
                 {
-                    ConfigField<Toggle, bool>(root, name, getValue, ref update);
+                    ConfigureField<Toggle, bool>(root, name, getValue, ref update);
                 }
                 else if (type == typeof(NetworkBool))
                 {
-                    var fd = new Toggle();
-                    fd.label = name;
-                    root.Add(fd);
-                    update += () =>
-                    {
-                        fd.value = (NetworkBool)getValue();
-                    };
+                    ConfigureField<Toggle, bool>(root, name, ()=> (bool)(NetworkBool)getValue(), ref update);
                 }
                 else if (type.IsEnum)
                 {
                     if (type.CustomAttributes.Any(x => x.AttributeType == typeof(FlagsAttribute)))
                     {
-                        var fd = new EnumFlagsField();
+                        var fd = ConfigureField<EnumFlagsField,Enum>(root, name, getValue, ref update);
                         fd.Init((Enum)Activator.CreateInstance(type), false);
-                        fd.label = name;
-                        root.Add(fd);
-                        update += () =>
-                        {
-                            fd.value = (Enum)getValue();
-                        };
                     }
                     else
                     {
-                        var fd = new EnumField();
+                        var fd = ConfigureField<EnumField, Enum>(root, name, getValue, ref update);
                         fd.Init((Enum)Activator.CreateInstance(type), false);
-                        fd.label = name;
-                        root.Add(fd);
-                        update += () =>
-                        {
-                            fd.value = (Enum)getValue();
-                        };
                     }
                 }
-
                 else if (type.FullName.StartsWith("Netick.NetworkString"))
                 {
-                    var textFd = new TextField();
-                    textFd.label = name;
-                    root.Add(textFd);
-                    update += () =>
-                    {
-                        if (!textFd.enabledInHierarchy)
-                        {
-                            return;
-                        }
-                        textFd.value = getValue().ToString();
-                    };
+                    ConfigureField<TextField, string>(root, name, () => getValue().ToString(), ref update);
                 }
                 else if (type.FullName.StartsWith("Netick.FixedSize"))
                 {
@@ -316,6 +268,7 @@ namespace Cjx.Unity.Netick.Editor
                     List<object> source = new List<object>();
                     var ls = new ListView();
                     var fields = type.GetFields(All).ToArray();
+                    
                     ls.makeItem = () =>
                     {
                         var item = new VisualElement();
@@ -378,7 +331,9 @@ namespace Cjx.Unity.Netick.Editor
                     }
                     else
                     {
-                        content.Insert(0, new Label(name));
+                        var label = new Label(name);
+                        label.style.unityTextAlign = new StyleEnum<TextAnchor>(TextAnchor.MiddleCenter);
+                        content.Insert(0, label);
                         root.Add(content);
                     }
                 }
