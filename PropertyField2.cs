@@ -609,11 +609,11 @@ internal class PropertyField2 : VisualElement, IBindable
         });
     }
     
-    private static readonly Type ScriptAttributeUtilityType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.ScriptAttributeUtility");
-    private static readonly Type NativeClassExtensionUtilitiesType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.NativeClassExtensionUtilities");
-    private static readonly Type EnumDataUtilityType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.EnumDataUtility");
-    private static readonly Type EnumDataType = typeof(UnityEngine.Object).Assembly.GetType("UnityEngine.EnumData");
-    private static readonly Type EditorGUI_EnumNamesCacheType = typeof(EditorGUI).GetNestedType("EnumNamesCache", BindingFlags.NonPublic);
+    public static readonly Type ScriptAttributeUtilityType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.ScriptAttributeUtility");
+    public static readonly Type NativeClassExtensionUtilitiesType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.NativeClassExtensionUtilities");
+    public static readonly Type EnumDataUtilityType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.EnumDataUtility");
+    public static readonly Type EnumDataType = typeof(UnityEngine.Object).Assembly.GetType("UnityEngine.EnumData");
+    public static readonly Type EditorGUI_EnumNamesCacheType = typeof(EditorGUI).GetNestedType("EnumNamesCache", BindingFlags.NonPublic);
 
     private void ComputeNestingLevel()
     {

@@ -7,7 +7,6 @@ using Netick;
 using Netick.Unity;
 using NetickEditor;
 using UnityEditor;
-using UnityEditor.Callbacks;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -87,7 +86,6 @@ namespace Cjx.Unity.Netick.Editor
         }
     }
 
-
     [CustomPropertyDrawer(typeof(NetworkBool))]
     public class NetworkBoolPropertyDrawer : PropertyDrawer
     {
@@ -104,7 +102,7 @@ namespace Cjx.Unity.Netick.Editor
         }
     }
 
-    internal class MyEditor : NetworkBehaviourEditor
+    internal class MyEditor : Editor
     {
         EditorApplication.CallbackFunction update;
 
@@ -124,6 +122,7 @@ namespace Cjx.Unity.Netick.Editor
 
         private void DefaultInspector(VisualElement root)
         {
+            var networkProperties = new VisualElement();
             SerializedProperty iterator = serializedObject.GetIterator();
             if (iterator.NextVisible(enterChildren: true))
             {
@@ -144,10 +143,47 @@ namespace Cjx.Unity.Netick.Editor
                     {
                         propertyField.SetEnabled(value: false);
                     }
+
+                    var parameters = new object[] { iterator, null };
+                    FieldInfo fieldInfoFromProperty = PropertyField2.CallStatic<FieldInfo>(PropertyField2.ScriptAttributeUtilityType, "GetFieldInfoFromProperty", parameters);
+                    var type = parameters[1] as Type;
+                    if (type != null && iterator.name.EndsWith(">k__BackingField"))
+                    {
+                        var p = fieldInfoFromProperty.DeclaringType.GetProperty(iterator.name.Substring(1, iterator.name.Length - 1 - ">k__BackingField".Length));
+                        if (p != null && p.CustomAttributes.Any(x => x.AttributeType == typeof(Networked)))
+                        {
+                            networkProperties.Add(propertyField);
+                            continue;
+                        }
+                    }
+
                     root.Add(propertyField);
                 }
                 while (iterator.Next(enterChildren: false));
             }
+            if (networkProperties.childCount > 0)
+            {
+                var label = new Label("Network Properties");
+                label.style.unityFontStyleAndWeight = new StyleEnum<FontStyle>(FontStyle.BoldAndItalic);
+                label.style.fontSize = 14;
+                ColorUtility.TryParseHtmlString("#5FA6F3", out var color);
+                label.style.color = new StyleColor(color);
+                networkProperties.Insert(0, label);
+                networkProperties.Insert(1,CreateSplitLine());
+                networkProperties.Add(CreateSplitLine());
+                //networkProperties.style.backgroundColor = new StyleColor(new Color(0.2013172f, 0.365789f, 0.490566f, 0.7607843f));
+                root.Insert(1, networkProperties);
+            }
+        }
+
+        private VisualElement CreateSplitLine()
+        {
+            var splitLine = new VisualElement();
+            splitLine.style.backgroundColor = new StyleColor(Color.grey);
+            splitLine.style.marginTop = new StyleLength(8f);
+            splitLine.style.marginBottom = new StyleLength(8f);
+            splitLine.style.height = new StyleLength(1f);
+            return splitLine;
         }
 
         private unsafe void CreateDebugEditor(VisualElement root)
