@@ -87,6 +87,23 @@ namespace Cjx.Unity.Netick.Editor
         }
     }
 
+
+    [CustomPropertyDrawer(typeof(NetworkBool))]
+    public class NetworkBoolPropertyDrawer : PropertyDrawer
+    {
+        public override VisualElement CreatePropertyGUI(SerializedProperty property)
+        {
+            var field = new Toggle();
+            field.label = property.displayName;
+            field.RegisterValueChangedCallback(e => {
+                property.FindPropertyRelative("RawValue").intValue = e.newValue ? 1 : 0;
+            });
+            field.value = property.FindPropertyRelative("RawValue").intValue != 0;
+            EditorEx.ConfigureStyle<Toggle,bool>(field);
+            return field;
+        }
+    }
+
     internal class MyEditor : NetworkBehaviourEditor
     {
         EditorApplication.CallbackFunction update;
@@ -95,11 +112,9 @@ namespace Cjx.Unity.Netick.Editor
         {
 
             var root = new VisualElement();
-            //InspectorElement.FillDefaultInspector(root, serializedObject, this);
 
-            var defaultImpl = new IMGUIContainer(() => base.OnInspectorGUI());
-            root.Add(defaultImpl);
-
+            DefaultInspector(root);
+            
             if (((NetworkBehaviour)target).StatePtr != null)
             {
                 CreateDebugEditor(root);
@@ -107,7 +122,35 @@ namespace Cjx.Unity.Netick.Editor
             return root;
         }
 
-        private void CreateDebugEditor(VisualElement root)
+        private void DefaultInspector(VisualElement root)
+        {
+            SerializedProperty iterator = serializedObject.GetIterator();
+            if (iterator.NextVisible(enterChildren: true))
+            {
+                do
+                {
+                    switch (iterator.name)
+                    {
+                        case "m_Name":
+                        case "m_EditorClassIdentifier":
+                            continue;
+                    }
+
+                    var propertyField = new PropertyField2(iterator)
+                    {
+                        name = "PropertyField:" + iterator.propertyPath
+                    };
+                    if (iterator.propertyPath == "m_Script")
+                    {
+                        propertyField.SetEnabled(value: false);
+                    }
+                    root.Add(propertyField);
+                }
+                while (iterator.Next(enterChildren: false));
+            }
+        }
+
+        private unsafe void CreateDebugEditor(VisualElement root)
         {
             var foldOut = new Foldout();
             foldOut.value = false;
@@ -116,7 +159,11 @@ namespace Cjx.Unity.Netick.Editor
             var content = EditorEx.Configure(target.GetType(), () => target, ref update);
             foldOut.Add(content);
             root.Add(foldOut);
-            this.update = () => update();
+            this.update = () => {
+                if (((NetworkBehaviour)target).StatePtr != null){
+                    update();
+                }
+            };
             EditorApplication.update += this.update;
         }
 
@@ -173,7 +220,6 @@ namespace Cjx.Unity.Netick.Editor
                     AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), ref update);
                 }
             }
-
             return root;
         }
 
@@ -191,7 +237,7 @@ namespace Cjx.Unity.Netick.Editor
             return fd;
         }
 
-        static void ConfigureStyle<TField,TValue>(TField field)
+        public static void ConfigureStyle<TField,TValue>(TField field)
         {
             configureStyleMethod.MakeGenericMethod(typeof(TField),typeof(TValue)).Invoke(null, new object[] { field });
         }
