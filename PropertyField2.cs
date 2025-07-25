@@ -557,11 +557,11 @@ internal class PropertyField2 : VisualElement, IBindable
                     using (handler.Call<IDisposable>("ApplyNestingContext",m_DrawNestingLevel))
                     {
                         handler.ReflectSetProperty("skipDecoratorDrawers", true);
-                        float leftMarginCoord = GetStaticField<EditorGUIUtility,float>("leftMarginCoord");
+                        float leftMarginCoord = GetStaticProperty<EditorGUIUtility,float>("leftMarginCoord");
                         if (m_InspectorElement != null && m_imguiChildField != null)
                         {
                             float x = m_InspectorElement.worldBound.x;
-                            SetStaticField<EditorGUIUtility>("leftMarginCoord", 0f - m_imguiChildField.worldBound.x + x);
+                            SetStaticProperty<EditorGUIUtility>("leftMarginCoord", 0f - m_imguiChildField.worldBound.x + x);
                         }
 
                         if (label == null)
@@ -579,7 +579,7 @@ internal class PropertyField2 : VisualElement, IBindable
 
                         if (m_InspectorElement != null && m_imguiChildField != null)
                         {
-                            SetStaticField<EditorGUIUtility>("leftMarginCoord", leftMarginCoord);
+                            SetStaticProperty<EditorGUIUtility>("leftMarginCoord", leftMarginCoord);
                         }
                     }
 
