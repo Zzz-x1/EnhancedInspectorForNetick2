@@ -1,6 +1,6 @@
 {
   "name": "com.cjx.debugviewfornetick",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "displayName": "DebugViewForNetick",
   "description": "visualize network states",
   "unity": "2022.3",
