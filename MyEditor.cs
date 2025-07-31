@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reflection;
 using Netick;
 using Netick.Unity;
-using NetickEditor;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;

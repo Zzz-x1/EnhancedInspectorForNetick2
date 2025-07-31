@@ -1,7 +1,7 @@
 {
-  "name": "com.cjx.debugviewfornetick",
-  "version": "0.1.2",
-  "displayName": "DebugViewForNetick",
+  "name": "com.cjx.enhancedinspector-netick2",
+  "version": "0.1.3",
+  "displayName": "EnhancedInspector-Netick2",
   "description": "visualize network states",
   "unity": "2022.3",
   "keywords": [

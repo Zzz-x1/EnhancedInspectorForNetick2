@@ -1,5 +1,5 @@
 {
-    "name": "DebugViewForNetick",
+    "name": "EnhancedInspector.Netick2",
     "rootNamespace": "",
     "references": [],
     "includePlatforms": [
@@ -9,7 +9,6 @@
     "allowUnsafeCode": true,
     "overrideReferences": true,
     "precompiledReferences": [
-        "Netick.Unity.Editor.dll",
         "Netick.dll",
         "Netick.Unity.dll"
     ],
