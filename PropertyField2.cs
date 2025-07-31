@@ -46,6 +46,11 @@ internal static class ReflectionEx
     {
         obj.GetType().GetProperty(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).SetValue(obj,value);
     }
+
+    public static void ReflectSetField(this object obj, string fieldName, object value)
+    {
+        obj.GetType().GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).SetValue(obj, value);
+    }
 }
 
 /// <summary>
@@ -869,7 +874,7 @@ internal class PropertyField2 : VisualElement, IBindable
             listView.showFoldoutHeader = true;
             listView.virtualizationMethod = CollectionVirtualizationMethod.DynamicHeight;
             listView.showAlternatingRowBackgrounds = AlternatingRowBackground.None;
-            listView.ReflectSetProperty("itemsSourceSizeChanged", listView.GetProperty<Action>("itemsSourceSizeChanged") + DispatchPropertyChangedEvent) ;
+            listView.Call("add_itemsSourceSizeChanged",(Action)DispatchPropertyChangedEvent) ;
         }
 
         SerializedProperty serializedProperty = property.Copy();
@@ -879,7 +884,7 @@ internal class PropertyField2 : VisualElement, IBindable
         listView.bindingPath = property.propertyPath;
         listView.viewDataKey = text;
         listView.name = text;
-        listView.ReflectSetProperty(listViewBoundFieldProperty, this);
+        listView.Call("SetProperty",(PropertyName)listViewBoundFieldProperty, this);
         Toggle toggle = listView.Q<Toggle>(null, Foldout.toggleUssClassName);
         if (toggle != null)
         {

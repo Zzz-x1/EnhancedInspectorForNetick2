@@ -188,9 +188,10 @@ namespace Cjx.Unity.Netick.Editor
 
         private unsafe void CreateDebugEditor(VisualElement root)
         {
+            root.Add(CreateSplitLine());
             var foldOut = new Foldout();
             foldOut.value = false;
-            foldOut.text = "Debug";
+            foldOut.text = "Network State (Runtime)";
             Action update = null;
             var content = EditorEx.Configure(target.GetType(), () => target, ref update);
             foldOut.Add(content);
