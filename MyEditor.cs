@@ -56,7 +56,11 @@ namespace Cjx.Unity.Netick.Editor
         {
             var o = typeof(Editor).Assembly.GetType("UnityEditor.CustomEditorAttributes");//
             var dictField = o.GetField("kSCustomEditors", BindingFlags.Static | BindingFlags.NonPublic);
+            var dictField2 = o.GetField("kSCustomMultiEditors", BindingFlags.Static | BindingFlags.NonPublic);
+            
             var dict = dictField.GetValue(null);
+            var dict2 = dictField2.GetValue(null);
+
             var listType = dict.GetType().GetGenericArguments()[1];
             var monoEditorType = listType.GetGenericArguments()[0];
             var bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
@@ -82,6 +86,9 @@ namespace Cjx.Unity.Netick.Editor
 
             removeMd.Invoke(dict, new[] { typeof(NetworkBehaviour) });
             addMd.Invoke(dict, new object[] { typeof(NetworkBehaviour), lsInst });
+
+            removeMd.Invoke(dict2, new[] { typeof(NetworkBehaviour) });
+            addMd.Invoke(dict2, new object[] { typeof(NetworkBehaviour), lsInst });
         }
     }
 
@@ -101,6 +108,8 @@ namespace Cjx.Unity.Netick.Editor
         }
     }
 
+    [CanEditMultipleObjects]
+    [CustomEditor(typeof(MonoBehaviour),true)]
     internal class MyEditor : Editor
     {
         EditorApplication.CallbackFunction update;
@@ -111,12 +120,77 @@ namespace Cjx.Unity.Netick.Editor
             var root = new VisualElement();
 
             DefaultInspector(root);
-            
-            if (((NetworkBehaviour)target).StatePtr != null)
+
+            if (targets.Length == 1)
             {
-                CreateDebugEditor(root);
+                if (target is NetworkBehaviour nb && nb.StatePtr != null)
+                {
+                    CreateDebugEditor(root);
+                }
             }
+            AddButtons(root);
+
             return root;
+        }
+
+        private void AddButtons(VisualElement root)
+        {
+            var methods = target.GetType()
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+                .Where(x=>x.CustomAttributes.Any(x=>x.AttributeType.Name == "ButtonAttribute"));
+
+            if (methods.Any())
+            {
+                var foldOut = new Foldout();
+                var label = new Label("Functions");
+                label.style.marginTop = 10f;
+                root.Add(label);
+                root.Add(CreateSplitLine());
+                root.Add(foldOut);
+                foreach (var method in methods)
+                {
+                    var item = new VisualElement();
+                    item.style.backgroundColor = new StyleColor(new Color(0, 0, 0, 0.2f));
+                    item.style.marginBottom = 8f;
+
+                    var btn = new Button();
+                    btn.text = method.Name;
+                    object[] args = new object[method.GetParameters().Length];
+
+                    btn.clicked += () => {
+                        foreach (var t in targets)
+                        {
+                            method.Invoke(method.IsStatic ? null : t, args);
+                        }
+                    };
+
+                    Action update = null;
+
+                    var @params = method.GetParameters();
+                    for (int i = 0; i < @params.Length; i++)
+                    {
+                        var index = i;
+                        var param = @params[i];
+                        if (param.ParameterType == typeof(string))
+                        {
+                            args[i] = string.Empty;
+                        }
+                        else
+                        {
+                            if (param.ParameterType.IsValueType)
+                            {
+                                args[i] = Activator.CreateInstance(param.ParameterType);
+                            }
+                        }
+                        EditorEx.AddDisplayItem(item, param.Name, param.ParameterType, () => args[index], x => args[index] = x, ref update);
+                    }
+                    item.Add(btn);
+                    update?.Invoke();
+                    //item.style.flexDirection = new StyleEnum<FlexDirection>(FlexDirection.Row);
+
+                    foldOut.Add(item);
+                }
+            }
         }
 
         private void DefaultInspector(VisualElement root)
@@ -192,7 +266,7 @@ namespace Cjx.Unity.Netick.Editor
             foldOut.value = false;
             foldOut.text = "Network State (Runtime)";
             Action update = null;
-            var content = EditorEx.Configure(target.GetType(), () => target, ref update);
+            var content = EditorEx.Configure(target.GetType(), () => target, null, ref update);
             foldOut.Add(content);
             root.Add(foldOut);
             this.update = () => {
@@ -217,9 +291,9 @@ namespace Cjx.Unity.Netick.Editor
 
         static BindingFlags All = BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic;
 
-        static MethodInfo configureStyleMethod = typeof(PropertyField).GetMethod("ConfigureFieldStyles",BindingFlags.Static | BindingFlags.NonPublic);
+        static MethodInfo configureStyleMethod = typeof(PropertyField).GetMethod("ConfigureFieldStyles", BindingFlags.Static | BindingFlags.NonPublic);
 
-        public static VisualElement Configure(Type type, Func<object> targetGet, ref Action update)
+        public static VisualElement Configure(Type type, Func<object> targetGet, Action<object> targetSet, ref Action update)
         {
             object source = null;
 
@@ -233,155 +307,187 @@ namespace Cjx.Unity.Netick.Editor
 
             if (isNetworkBehaviour && type.BaseType != typeof(NetworkBehaviour))
             {
-                var baseRoot = Configure(type.BaseType, targetGet, ref update);
+                var baseRoot = Configure(type.BaseType, targetGet, targetSet, ref update);
                 root.Add(baseRoot);
             }
 
             foreach (var prop in type.GetProperties(All).Where(x => x.DeclaringType == type && x.CustomAttributes.Any(x => x.AttributeType == typeof(Networked))))
             {
-                AddDisplayItem(root, prop.Name, prop.PropertyType, () => prop.GetMethod.Invoke(source, Array.Empty<object>()), ref update);
+                Action<object> set = prop.SetMethod == null ? null : val =>
+                {
+                    prop.SetValue(source, val);
+                    targetSet?.Invoke(source);
+                };
+
+                AddDisplayItem(root, prop.Name, prop.PropertyType, () => prop.GetValue(source), set, ref update);
             }
 
             if (!isNetworkBehaviour)
             {
                 foreach (var field in type.GetFields(All))
                 {
-                    AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), ref update);
+                    Action<object> set = type.IsValueType && targetSet == null ? null : val =>
+                    {
+                        source = targetGet();
+                        field.SetValue(source, val);
+                        targetSet?.Invoke(source);
+                    };
+                    AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), set, ref update);
                 }
             }
             else
             {
                 foreach (var field in type.GetFields(All).Where(x => x.CustomAttributes.Any(x => x.AttributeType == typeof(Networked))))
                 {
-                    AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), ref update);
+                    Action<object> set = val =>
+                    {
+                        field.SetValue(source, val);
+                        targetSet?.Invoke(source);
+                    };
+                    AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), set, ref update);
                 }
             }
             return root;
         }
 
-        static TField ConfigureField<TField, TValue>(VisualElement root, string name, Func<object> getValue, ref Action update) where TField : BaseField<TValue>, new()
+        public static TField ConfigureField<TField, TValue>(VisualElement root, string name, Func<object> getValue, Action<object> setValue, ref Action update) where TField : BaseField<TValue>, new()
         {
             var fd = new TField();
             fd.label = name;
             root.Add(fd);
+            bool execChangeEvent = true;
             update += () =>
             {
+                execChangeEvent = false;
                 fd.value = (TValue)getValue();
+                execChangeEvent = true;
             };
-            fd.SetEnabled(false);
-            ConfigureStyle<TField,TValue>(fd);
+            fd.SetEnabled(setValue != null);
+            ConfigureStyle<TField, TValue>(fd);
+            if (setValue != null)
+            {
+                fd.RegisterValueChangedCallback(evt =>
+                {
+                    if (execChangeEvent)
+                    {
+                        var val = evt.newValue;
+                        setValue(val);
+                    }
+                });
+            }
             return fd;
         }
 
-        public static void ConfigureStyle<TField,TValue>(TField field)
+        public static void ConfigureStyle<TField, TValue>(TField field)
         {
-            configureStyleMethod.MakeGenericMethod(typeof(TField),typeof(TValue)).Invoke(null, new object[] { field });
+            configureStyleMethod.MakeGenericMethod(typeof(TField), typeof(TValue)).Invoke(null, new object[] { field });
         }
 
-        static void AddDisplayItem(VisualElement root, string name, Type type, Func<object> getValue, ref Action update)
+        public static void AddDisplayItem(VisualElement root, string name, Type type, Func<object> getValue, Action<object> setValue, ref Action update)
         {
             if (type.IsValueType)
             {
                 if (type == typeof(int))
                 {
-                    ConfigureField<IntegerField,int>(root, name, getValue, ref update);
+                    ConfigureField<IntegerField, int>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(short))
                 {
-                    ConfigureField<IntegerField, int>(root, name, () => (int)(short)getValue(), ref update);
+                    ConfigureField<IntegerField, int>(root, name, () => (int)(short)getValue(), setValue == null ? null : val => setValue((short)(int)val), ref update);
                 }
                 else if (type == typeof(uint))
                 {
-                    ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)getValue(), ref update);
+                    ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)getValue(), setValue, ref update);
                 }
                 else if (type == typeof(ushort))
                 {
-                    ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)(ushort)getValue(), ref update);
+                    ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)(ushort)getValue(), setValue == null ? null : val => setValue((ushort)(uint)val), ref update);
                 }
                 else if (type == typeof(long))
                 {
-                    ConfigureField<LongField, long>(root, name, getValue, ref update);
+                    ConfigureField<LongField, long>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(ulong))
                 {
-                    ConfigureField<UnsignedLongField, ulong>(root, name, getValue, ref update);
+                    ConfigureField<UnsignedLongField, ulong>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(float))
                 {
-                    ConfigureField<FloatField, float>(root, name, getValue, ref update);
+                    ConfigureField<FloatField, float>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(double))
                 {
-                    ConfigureField<DoubleField, double>(root, name, getValue, ref update);
+                    ConfigureField<DoubleField, double>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Vector3))
                 {
-                    ConfigureField<Vector3Field, Vector3>(root, name, getValue, ref update);
+                    ConfigureField<Vector3Field, Vector3>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Vector3Int))
                 {
-                    ConfigureField<Vector3IntField, Vector3Int>(root, name, getValue, ref update);
+                    ConfigureField<Vector3IntField, Vector3Int>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Vector2Int))
                 {
-                    ConfigureField<Vector2IntField, Vector2Int>(root, name, getValue, ref update);
+                    ConfigureField<Vector2IntField, Vector2Int>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Vector2))
                 {
-                    ConfigureField<Vector2Field, Vector2>(root, name, getValue, ref update);
+                    ConfigureField<Vector2Field, Vector2>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Vector4))
                 {
-                    ConfigureField<Vector4Field, Vector4>(root, name, getValue, ref update);
+                    ConfigureField<Vector4Field, Vector4>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Color))
                 {
-                    ConfigureField<ColorField, Color>(root, name, getValue, ref update);
+                    ConfigureField<ColorField, Color>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Rect))
                 {
-                    ConfigureField<RectField, Rect>(root, name, getValue, ref update);
+                    ConfigureField<RectField, Rect>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Bounds))
                 {
-                    ConfigureField<BoundsField, Bounds>(root, name, getValue, ref update);
+                    ConfigureField<BoundsField, Bounds>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(Hash128))
                 {
-                    ConfigureField<Hash128Field, Hash128>(root, name, getValue, ref update);
+                    ConfigureField<Hash128Field, Hash128>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(bool))
                 {
-                    ConfigureField<Toggle, bool>(root, name, getValue, ref update);
+                    ConfigureField<Toggle, bool>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(NetworkBool))
                 {
-                    ConfigureField<Toggle, bool>(root, name, ()=> (bool)(NetworkBool)getValue(), ref update);
+                    ConfigureField<Toggle, bool>(root, name, () => (bool)(NetworkBool)getValue(), setValue == null ? null : val => setValue((bool)(NetworkBool)val), ref update);
                 }
                 else if (type == typeof(Quaternion))
                 {
-                    ConfigureField<Vector4Field, Vector4>(root, name, () => {
+                    ConfigureField<Vector4Field, Vector4>(root, name, () =>
+                    {
                         var raw = (Quaternion)getValue();
-                        return new Vector4(raw.x,raw.y,raw.z,raw.w);
-                    }, ref update);
-                    ConfigureField<Vector3Field, Vector3>(root, name + ".eulerAngles", () => ((Quaternion)getValue()).eulerAngles, ref update);
+                        return new Vector4(raw.x, raw.y, raw.z, raw.w);
+                    }, null, ref update);
+                    ConfigureField<Vector3Field, Vector3>(root, name + ".eulerAngles", () => ((Quaternion)getValue()).eulerAngles, setValue == null ? null : val => setValue(Quaternion.Euler((Vector3)val)), ref update);
                 }
                 else if (type.IsEnum)
                 {
                     if (type.CustomAttributes.Any(x => x.AttributeType == typeof(FlagsAttribute)))
                     {
-                        var fd = ConfigureField<EnumFlagsField,Enum>(root, name, getValue, ref update);
+                        var fd = ConfigureField<EnumFlagsField, Enum>(root, name, getValue, setValue, ref update);
                         fd.Init((Enum)Activator.CreateInstance(type), false);
                     }
                     else
                     {
-                        var fd = ConfigureField<EnumField, Enum>(root, name, getValue, ref update);
+                        var fd = ConfigureField<EnumField, Enum>(root, name, getValue, setValue, ref update);
                         fd.Init((Enum)Activator.CreateInstance(type), false);
                     }
                 }
                 else if (type.FullName.StartsWith("Netick.NetworkString"))
                 {
-                    ConfigureField<TextField, string>(root, name, () => getValue().ToString(), ref update);
+                    ConfigureField<TextField, string>(root, name, () => getValue().ToString(), setValue == null ? null : val => setValue(Activator.CreateInstance(type, val)), ref update);
                 }
                 else if (type.FullName.StartsWith("Netick.FixedSize"))
                 {
@@ -390,7 +496,7 @@ namespace Cjx.Unity.Netick.Editor
                     List<object> source = new List<object>();
                     var ls = new ListView();
                     var fields = type.GetFields(All).ToArray();
-                    
+
                     ls.makeItem = () =>
                     {
                         var item = new VisualElement();
@@ -399,7 +505,13 @@ namespace Cjx.Unity.Netick.Editor
                     ls.bindItem = (v, i) =>
                     {
                         Action itemUpdate = null;
-                        AddDisplayItem(v, $"Element{i}", type.GetGenericArguments()[0], () => source[i], ref itemUpdate);
+                        Action<object> set = val =>
+                        {
+                            var temp = getValue();
+                            fields[i].SetValue(temp, val);
+                            setValue?.Invoke(temp);
+                        };
+                        AddDisplayItem(v, $"Element{i}", type.GetGenericArguments()[0], () => source[i], set, ref itemUpdate);
                         Action action = () => itemUpdate?.Invoke();
                         v.userData = action;
                         lsUpdate += action;
@@ -413,16 +525,14 @@ namespace Cjx.Unity.Netick.Editor
                     ls.virtualizationMethod = CollectionVirtualizationMethod.DynamicHeight;
                     update += () =>
                     {
-                        if (ls.itemsSource == null)
+                        source.Clear();
+                        var buffer = getValue();
+                        for (int i = 0; i < fields.Length; i++)
                         {
-                            var buffer = getValue();
-                            for (int i = 0; i < fields.Length; i++)
-                            {
-                                var element = fields[i].GetValue(buffer);
-                                source.Add(element);
-                            }
-                            ls.itemsSource = source;
+                            var element = fields[i].GetValue(buffer);
+                            source.Add(element);
                         }
+                        ls.itemsSource = source;
                     };
                     var foldOut = new Foldout();
                     foldOut.text = name;
@@ -436,7 +546,7 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (!type.IsPrimitive)
                 {
-                    var content = Configure(type, getValue, ref update);
+                    var content = Configure(type, getValue, setValue, ref update);
                     bool needFoldOut = true;
                     if (type.IsConstructedGenericType && typeof(KeyValuePair<,>) == type.GetGenericTypeDefinition())
                     {
@@ -462,7 +572,15 @@ namespace Cjx.Unity.Netick.Editor
             }
             else
             {
-                if (typeof(IEnumerable).IsAssignableFrom(type))
+                if (type == typeof(string))
+                {
+                    ConfigureField<TextField, string>(root, name, getValue, setValue, ref update);
+                }
+                else if (typeof(UnityEngine.Object).IsAssignableFrom(type))
+                {
+                    ConfigureField<ObjectField, UnityEngine.Object>(root, name, getValue, setValue, ref update);
+                }
+                else if (typeof(IEnumerable).IsAssignableFrom(type))
                 {
                     int displayCount = 0;
                     Action lsUpdate = null;
@@ -479,7 +597,7 @@ namespace Cjx.Unity.Netick.Editor
                     ls.bindItem = (v, i) =>
                     {
                         Action itemUpdate = null;
-                        AddDisplayItem(v, $"Element{i}", elementType, () => source[i], ref itemUpdate);
+                        AddDisplayItem(v, $"Element{i}", elementType, () => source[i], null, ref itemUpdate);
                         v.userData = itemUpdate;
                         lsUpdate += itemUpdate;
                     };
