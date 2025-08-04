@@ -141,11 +141,8 @@ namespace Cjx.Unity.Netick.Editor
 
             if (methods.Any())
             {
-                var foldOut = new Foldout();
-                var label = new Label("Functions");
-                label.style.marginTop = 10f;
-                root.Add(label);
                 root.Add(CreateSplitLine());
+                var foldOut = CreateFoldOut("Functions");
                 root.Add(foldOut);
                 foreach (var method in methods)
                 {
@@ -186,8 +183,6 @@ namespace Cjx.Unity.Netick.Editor
                     }
                     item.Add(btn);
                     update?.Invoke();
-                    //item.style.flexDirection = new StyleEnum<FlexDirection>(FlexDirection.Row);
-
                     foldOut.Add(item);
                 }
             }
@@ -195,30 +190,42 @@ namespace Cjx.Unity.Netick.Editor
 
         private void DefaultInspector(VisualElement root)
         {
-            var networkProperties = new VisualElement();
+            var defaultInspector = new VisualElement();
+            InspectorElement.FillDefaultInspector(defaultInspector, this.serializedObject, this);
+
+            var defaultContent = CreateFoldOut("Default");
+            bool isFirstItem = true;
+            foreach(var item in defaultInspector.Children().ToArray())
+            {
+                if (isFirstItem)
+                {
+                    isFirstItem = false;
+                    root.Add(item);
+                    root.Add(CreateSplitLine());
+                    continue;
+                }
+                else
+                {
+                    defaultContent.Add(item);
+                }
+            }
+            root.Add(defaultContent);
+
+            var networkProperties = CreateFoldOut("Network Properties");
+            var serializedObject = new SerializedObject(target);
+            serializedObject.forceChildVisibility = true;
             SerializedProperty iterator = serializedObject.GetIterator();
             if (iterator.NextVisible(enterChildren: true))
             {
                 do
                 {
-                    switch (iterator.name)
-                    {
-                        case "m_Name":
-                        case "m_EditorClassIdentifier":
-                            continue;
-                    }
-
-                    var propertyField = new PropertyField2(iterator)
+                    var propertyField = new PropertyField(iterator)
                     {
                         name = "PropertyField:" + iterator.propertyPath
                     };
-                    if (iterator.propertyPath == "m_Script")
-                    {
-                        propertyField.SetEnabled(value: false);
-                    }
 
                     var parameters = new object[] { iterator, null };
-                    FieldInfo fieldInfoFromProperty = PropertyField2.CallStatic<FieldInfo>(PropertyField2.ScriptAttributeUtilityType, "GetFieldInfoFromProperty", parameters);
+                    FieldInfo fieldInfoFromProperty = ReflectionEx.CallStatic<FieldInfo>(ReflectionEx.ScriptAttributeUtilityType, "GetFieldInfoFromProperty", parameters);
                     var type = parameters[1] as Type;
                     if (type != null && iterator.name.EndsWith(">k__BackingField"))
                     {
@@ -226,27 +233,42 @@ namespace Cjx.Unity.Netick.Editor
                         if (p != null && p.CustomAttributes.Any(x => x.AttributeType == typeof(Networked)))
                         {
                             networkProperties.Add(propertyField);
-                            continue;
                         }
                     }
-
-                    root.Add(propertyField);
                 }
                 while (iterator.Next(enterChildren: false));
             }
             if (networkProperties.childCount > 0)
             {
-                var label = new Label("Network Properties");
-                label.style.unityFontStyleAndWeight = new StyleEnum<FontStyle>(FontStyle.BoldAndItalic);
-                label.style.fontSize = 14;
-                ColorUtility.TryParseHtmlString("#5FA6F3", out var color);
-                label.style.color = new StyleColor(color);
-                networkProperties.Insert(0, label);
-                networkProperties.Insert(1,CreateSplitLine());
-                networkProperties.Add(CreateSplitLine());
-                //networkProperties.style.backgroundColor = new StyleColor(new Color(0.2013172f, 0.365789f, 0.490566f, 0.7607843f));
-                root.Insert(1, networkProperties);
+                root.Add(CreateSplitLine());
+                root.Add(networkProperties);
             }
+        }
+
+        private VisualElement CreateTitle(string text, Color? color = null)
+        {
+            var label = new Label(text);
+            label.style.unityFontStyleAndWeight = new StyleEnum<FontStyle>(FontStyle.BoldAndItalic);
+            label.style.fontSize = 14;
+            label.style.color = new StyleColor(color ?? Color.gray);
+            label.style.marginBottom = 10f;
+            label.style.marginLeft = 3f;
+            return label;
+        }
+
+        private Foldout CreateFoldOut(string text, Color? color = null)
+        {
+            var foldOut = new Foldout();
+            foldOut.text = text;
+            var label = foldOut.Q<Label>();
+            label.style.unityFontStyleAndWeight = new StyleEnum<FontStyle>(FontStyle.BoldAndItalic);
+            label.style.fontSize = 14;
+            label.style.color = new StyleColor(color ?? Color.gray);
+            foldOut.style.marginBottom = 10f;
+            foldOut.style.marginLeft = 3f;
+            var content = foldOut.Q("unity-content");
+            content.style.marginLeft = 0;
+            return foldOut;
         }
 
         private VisualElement CreateSplitLine()
@@ -262,9 +284,7 @@ namespace Cjx.Unity.Netick.Editor
         private unsafe void CreateDebugEditor(VisualElement root)
         {
             root.Add(CreateSplitLine());
-            var foldOut = new Foldout();
-            foldOut.value = false;
-            foldOut.text = "Network State (Runtime)";
+            var foldOut = CreateFoldOut("Network State (Runtime)");
             Action update = null;
             var content = EditorEx.Configure(target.GetType(), () => target, null, ref update);
             foldOut.Add(content);
