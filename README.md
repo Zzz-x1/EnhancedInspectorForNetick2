@@ -7,7 +7,7 @@
 - Select Add package from git URL
 - Enter https://github.com/Zzz-x1/EnhancedInspectorForNetick2.git
 ### Features
-- Provider inspector to view detial network state during runtime for debugging
+- Provider inspector that can read / write to network state during runtime for debugging
 - Support add PropertyAttribute to the backing field of network property.
 - Support PropertyDrawer implement with VisualElement
   
