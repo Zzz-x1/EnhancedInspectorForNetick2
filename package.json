@@ -1,9 +1,9 @@
 {
   "name": "com.cjx.enhancedinspector-netick2",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "displayName": "EnhancedInspector-Netick2",
   "description": "visualize network states",
-  "unity": "2022.3",
+  "unity": "2021.3",
   "keywords": [
     "networking",
     "multiplayer",

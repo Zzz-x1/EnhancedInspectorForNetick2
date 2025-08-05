@@ -383,7 +383,9 @@ namespace Cjx.Unity.Netick.Editor
                 execChangeEvent = true;
             };
             fd.SetEnabled(setValue != null);
+#if !UNITY_2021
             ConfigureStyle<TField, TValue>(fd);
+#endif
             if (setValue != null)
             {
                 fd.RegisterValueChangedCallback(evt =>
@@ -417,11 +419,19 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (type == typeof(uint))
                 {
+#if !UNITY_2021
                     ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)getValue(), setValue, ref update);
+#else
+                    ConfigureField<IntegerField, int>(root, name, () => (int)(uint)getValue(), setValue == null ? null : val => setValue((uint)(int)val), ref update);
+#endif
                 }
                 else if (type == typeof(ushort))
                 {
+#if !UNITY_2021
                     ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)(ushort)getValue(), setValue == null ? null : val => setValue((ushort)(uint)val), ref update);
+#else
+                    ConfigureField<IntegerField, int>(root, name, () => (int)(ushort)getValue(), setValue == null ? null : val => setValue((ushort)(int)val), ref update);
+#endif
                 }
                 else if (type == typeof(long))
                 {
@@ -429,7 +439,11 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (type == typeof(ulong))
                 {
+#if !UNITY_2021
                     ConfigureField<UnsignedLongField, ulong>(root, name, getValue, setValue, ref update);
+#else
+                    ConfigureField<LongField, long>(root, name, () => (long)(ulong)getValue(), setValue == null ? null : val => setValue((ulong)(long)val), ref update);
+#endif
                 }
                 else if (type == typeof(float))
                 {

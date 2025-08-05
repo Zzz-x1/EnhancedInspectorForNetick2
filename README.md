@@ -1,5 +1,5 @@
 ### Prerequisites
-- Unity Editor 2022.3 or higher
+- Unity Editor 2021.3 or higher
 
 ### Steps
 - Open the Unity Package Manager by navigating to Window > Package Manager along the top bar.
