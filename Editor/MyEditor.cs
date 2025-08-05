@@ -118,7 +118,7 @@ namespace Cjx.Unity.Netick.Editor
         {
 
             var root = new VisualElement();
-
+            root.userData = target;
             DefaultInspector(root);
 
             if (targets.Length == 1)
@@ -589,7 +589,52 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (!type.IsPrimitive)
                 {
-                    var content = Configure(type, getValue, setValue, ref update);
+
+                    if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(NetworkBehaviourRef<>))
+                    {
+                        var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () => {
+                            var md = type.GetMethods().First(x => x.Name == "GetBehaviour" && !x.ContainsGenericParameters);
+                            var rootVisual = root;
+                            NetworkBehaviour targetObj = null;
+                            while (rootVisual != null)
+                            {
+                                if (rootVisual.userData is NetworkBehaviour target)
+                                {
+                                    targetObj = target;
+                                    break;
+                                }
+                                rootVisual = rootVisual.parent;
+                            }
+                            var br = targetObj ? md?.Invoke(getValue(), new[] { targetObj.Sandbox }) : null;
+                            return br;
+                        }, val => { 
+                            setValue(Activator.CreateInstance(type,val));
+                        }, ref update);
+                        field.objectType = type.GenericTypeArguments.FirstOrDefault();
+                    }else if(type == typeof(NetworkObjectRef))
+                    {
+                        var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () => {
+                            var md = type.GetMethods().First(x => x.Name == "GetObject");
+                            var rootVisual = root;
+                            NetworkBehaviour targetObj = null;
+                            while (rootVisual != null)
+                            {
+                                if (rootVisual.userData is NetworkBehaviour target)
+                                {
+                                    targetObj = target;
+                                    break;
+                                }
+                                rootVisual = rootVisual.parent;
+                            }
+                            var br = targetObj ? md?.Invoke(getValue(), new[] { targetObj.Sandbox }) : null;
+                            return br;
+                        }, val => {
+                            setValue(Activator.CreateInstance(type, val));
+                        }, ref update);
+                        field.objectType = typeof(NetworkObject);
+                    }
+
+                        var content = Configure(type, getValue, setValue, ref update);
                     bool needFoldOut = true;
                     if (type.IsConstructedGenericType && typeof(KeyValuePair<,>) == type.GetGenericTypeDefinition())
                     {
