@@ -1,7 +1,9 @@
 {
-    "name": "EnhancedInspector.Netick2",
+    "name": "EnhancedInspector.Netick2.Editor",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "GUID:24c58647cbd0e07479fae1f363bec8e9"
+    ],
     "includePlatforms": [
         "Editor"
     ],

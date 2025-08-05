@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Reflection;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 
 internal static class ReflectionEx
 {
@@ -114,10 +116,11 @@ internal static class ReflectionEx
         typeof(TClass).GetMethod(methodName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Invoke(null, @params);
     }
 
-
+#if UNITY_EDITOR
     public static readonly Type ScriptAttributeUtilityType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.ScriptAttributeUtility");
     public static readonly Type NativeClassExtensionUtilitiesType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.NativeClassExtensionUtilities");
     public static readonly Type EnumDataUtilityType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.EnumDataUtility");
     public static readonly Type EnumDataType = typeof(UnityEngine.Object).Assembly.GetType("UnityEngine.EnumData");
     public static readonly Type EditorGUI_EnumNamesCacheType = typeof(EditorGUI).GetNestedType("EnumNamesCache", BindingFlags.NonPublic);
+# endif
 }
