@@ -201,7 +201,6 @@ namespace Cjx.Unity.Netick.Editor
                 {
                     isFirstItem = false;
                     root.Add(item);
-                    root.Add(CreateSplitLine());
                     continue;
                 }
                 else
@@ -209,7 +208,11 @@ namespace Cjx.Unity.Netick.Editor
                     defaultContent.Add(item);
                 }
             }
-            root.Add(defaultContent);
+            if (defaultContent.childCount > 0)
+            {
+                root.Add(CreateSplitLine());
+                root.Add(defaultContent);
+            }
 
             var networkProperties = CreateFoldOut("Network Properties");
             var serializedObject = new SerializedObject(target);
