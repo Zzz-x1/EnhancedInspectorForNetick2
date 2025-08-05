@@ -222,21 +222,27 @@ namespace Cjx.Unity.Netick.Editor
             {
                 do
                 {
-                    var propertyField = new PropertyField(iterator)
+                    try
                     {
-                        name = "PropertyField:" + iterator.propertyPath
-                    };
-
-                    var parameters = new object[] { iterator, null };
-                    FieldInfo fieldInfoFromProperty = ReflectionEx.CallStatic<FieldInfo>(ReflectionEx.ScriptAttributeUtilityType, "GetFieldInfoFromProperty", parameters);
-                    var type = parameters[1] as Type;
-                    if (type != null && iterator.name.EndsWith(">k__BackingField"))
-                    {
-                        var p = fieldInfoFromProperty.DeclaringType.GetProperty(iterator.name.Substring(1, iterator.name.Length - 1 - ">k__BackingField".Length));
-                        if (p != null && p.CustomAttributes.Any(x => x.AttributeType == typeof(Networked)))
+                        var propertyField = new PropertyField(iterator)
                         {
-                            networkProperties.Add(propertyField);
+                            name = "PropertyField:" + iterator.propertyPath
+                        };
+
+                        var parameters = new object[] { iterator, null };
+                        FieldInfo fieldInfoFromProperty = ReflectionEx.CallStatic<FieldInfo>(ReflectionEx.ScriptAttributeUtilityType, "GetFieldInfoFromProperty", parameters);
+                        var type = parameters[1] as Type;
+                        if (type != null && iterator.name.EndsWith(">k__BackingField"))
+                        {
+                            var p = fieldInfoFromProperty.DeclaringType.GetProperty(iterator.name.Substring(1, iterator.name.Length - 1 - ">k__BackingField".Length));
+                            if (p != null && p.CustomAttributes.Any(x => x.AttributeType == typeof(Networked)))
+                            {
+                                networkProperties.Add(propertyField);
+                            }
                         }
+                    }catch (Exception e)
+                    {
+                        Debug.LogException(e);
                     }
                 }
                 while (iterator.Next(enterChildren: false));
