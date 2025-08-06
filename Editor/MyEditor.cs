@@ -295,7 +295,7 @@ namespace Cjx.Unity.Netick.Editor
             root.Add(CreateSplitLine());
             var foldOut = CreateFoldOut("Network State (Runtime)");
             Action update = null;
-            var content = EditorEx.Configure(target.GetType(), () => target, null, ref update);
+            var content = EditorEx.Configure(target.GetType(), () => target, null , target is NetworkBehaviour nb && nb.IsServer , ref update);
             foldOut.Add(content);
             root.Add(foldOut);
             this.update = () => {
@@ -322,7 +322,7 @@ namespace Cjx.Unity.Netick.Editor
 
         static MethodInfo configureStyleMethod = typeof(PropertyField).GetMethod("ConfigureFieldStyles", BindingFlags.Static | BindingFlags.NonPublic);
 
-        public static VisualElement Configure(Type type, Func<object> targetGet, Action<object> targetSet, ref Action update)
+        public static VisualElement Configure(Type type, Func<object> targetGet, Action<object> targetSet, bool writable, ref Action update)
         {
             object source = null;
 
@@ -336,13 +336,13 @@ namespace Cjx.Unity.Netick.Editor
 
             if (isNetworkBehaviour && type.BaseType != typeof(NetworkBehaviour))
             {
-                var baseRoot = Configure(type.BaseType, targetGet, targetSet, ref update);
+                var baseRoot = Configure(type.BaseType, targetGet, targetSet, writable, ref update);
                 root.Add(baseRoot);
             }
 
             foreach (var prop in type.GetProperties(All).Where(x => x.DeclaringType == type && x.CustomAttributes.Any(x => x.AttributeType == typeof(Networked))))
             {
-                Action<object> set = prop.SetMethod == null ? null : val =>
+                Action<object> set = !writable ||prop.SetMethod == null ? null : val =>
                 {
                     prop.SetValue(source, val);
                     targetSet?.Invoke(source);
@@ -355,7 +355,7 @@ namespace Cjx.Unity.Netick.Editor
             {
                 foreach (var field in type.GetFields(All))
                 {
-                    Action<object> set = type.IsValueType && targetSet == null ? null : val =>
+                    Action<object> set = !writable || (type.IsValueType && targetSet == null) ? null : val =>
                     {
                         source = targetGet();
                         field.SetValue(source, val);
@@ -368,7 +368,7 @@ namespace Cjx.Unity.Netick.Editor
             {
                 foreach (var field in type.GetFields(All).Where(x => x.CustomAttributes.Any(x => x.AttributeType == typeof(Networked))))
                 {
-                    Action<object> set = val =>
+                    Action<object> set = !writable ? null : val =>
                     {
                         field.SetValue(source, val);
                         targetSet?.Invoke(source);
@@ -548,7 +548,7 @@ namespace Cjx.Unity.Netick.Editor
                     ls.bindItem = (v, i) =>
                     {
                         Action itemUpdate = null;
-                        Action<object> set = val =>
+                        Action<object> set = setValue == null ? null : val =>
                         {
                             var temp = getValue();
                             fields[i].SetValue(temp, val);
@@ -582,6 +582,10 @@ namespace Cjx.Unity.Netick.Editor
                     var scroll = new ScrollView();
                     scroll.Add(ls);
                     foldOut.Add(scroll);
+                    if (setValue == null)
+                    {
+                        foldOut.Q<Label>().style.color = Color.grey;
+                    }
                     root.Add(foldOut);
                     scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
                     scroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
@@ -611,7 +615,9 @@ namespace Cjx.Unity.Netick.Editor
                             setValue(Activator.CreateInstance(type,val));
                         }, ref update);
                         field.objectType = type.GenericTypeArguments.FirstOrDefault();
-                    }else if(type == typeof(NetworkObjectRef))
+                        name += " (Raw)";
+                    }
+                    else if(type == typeof(NetworkObjectRef))
                     {
                         var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () => {
                             var md = type.GetMethods().First(x => x.Name == "GetObject");
@@ -632,9 +638,10 @@ namespace Cjx.Unity.Netick.Editor
                             setValue(Activator.CreateInstance(type, val));
                         }, ref update);
                         field.objectType = typeof(NetworkObject);
+                        name += " (Raw)";
                     }
 
-                        var content = Configure(type, getValue, setValue, ref update);
+                    var content = Configure(type, getValue, setValue, setValue != null, ref update);
                     bool needFoldOut = true;
                     if (type.IsConstructedGenericType && typeof(KeyValuePair<,>) == type.GetGenericTypeDefinition())
                     {
@@ -647,6 +654,10 @@ namespace Cjx.Unity.Netick.Editor
                         foldOut.text = name;
                         foldOut.Add(content);
                         foldOut.value = false;
+                        if(setValue == null)
+                        {
+                            foldOut.Q<Label>().style.color = Color.grey;
+                        }
                         root.Add(foldOut);
                     }
                     else
