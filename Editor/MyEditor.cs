@@ -114,6 +114,9 @@ namespace Cjx.Unity.Netick.Editor
     {
         EditorApplication.CallbackFunction update;
 
+        [SerializeField]
+        VisualTreeAsset buttonAsset;
+
         public unsafe override VisualElement CreateInspectorGUI()
         {
 
@@ -146,12 +149,10 @@ namespace Cjx.Unity.Netick.Editor
                 root.Add(foldOut);
                 foreach (var method in methods)
                 {
-                    var item = new VisualElement();
-                    item.style.backgroundColor = new StyleColor(new Color(0, 0, 0, 0.2f));
-                    item.style.marginBottom = 8f;
-
-                    var btn = new Button();
-                    btn.text = method.Name;
+                    var item = buttonAsset.Instantiate();
+                    var btn = item.Q<Button>();
+                    var argsContent = item.Q("args");
+                    btn.text = ">";
                     object[] args = new object[method.GetParameters().Length];
 
                     btn.clicked += () => {
@@ -179,9 +180,9 @@ namespace Cjx.Unity.Netick.Editor
                                 args[i] = Activator.CreateInstance(param.ParameterType);
                             }
                         }
-                        EditorEx.AddDisplayItem(item, param.Name, param.ParameterType, () => args[index], x => args[index] = x, ref update);
+                        EditorEx.AddDisplayItem(argsContent, param.Name, param.ParameterType, () => args[index], x => args[index] = x, ref update);
                     }
-                    item.Add(btn);
+                    item.Q<Label>().text = method.Name;
                     update?.Invoke();
                     foldOut.Add(item);
                 }
@@ -379,6 +380,14 @@ namespace Cjx.Unity.Netick.Editor
             return root;
         }
 
+        public static TField ConfigureField<TField, TValue, TSource>(VisualElement root, string name, Func<object> getValue, Action<object> setValue, ref Action update) where TField : BaseField<TValue>, new()
+        {
+            return ConfigureField<TField, TValue>(root, name,
+                getValue == null ? null : () => System.Convert.ChangeType((TSource)getValue(), typeof(TValue)),
+                setValue == null ? null : val => setValue(System.Convert.ChangeType((TValue)val, typeof(TSource)))
+                ,ref update);
+        }
+
         public static TField ConfigureField<TField, TValue>(VisualElement root, string name, Func<object> getValue, Action<object> setValue, ref Action update) where TField : BaseField<TValue>, new()
         {
             var fd = new TField();
@@ -424,22 +433,22 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (type == typeof(short))
                 {
-                    ConfigureField<IntegerField, int>(root, name, () => (int)(short)getValue(), setValue == null ? null : val => setValue((short)(int)val), ref update);
+                    ConfigureField<IntegerField, int, short>(root, name, getValue, setValue, ref update);
                 }
                 else if (type == typeof(uint))
                 {
 #if !UNITY_2021
-                    ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)getValue(), setValue, ref update);
+                    ConfigureField<UnsignedIntegerField, uint>(root, name, getValue, setValue, ref update);
 #else
-                    ConfigureField<IntegerField, int>(root, name, () => (int)(uint)getValue(), setValue == null ? null : val => setValue((uint)(int)val), ref update);
+                    ConfigureField<IntegerField,int, uint>(root, name, getValue, setValue, ref update);
 #endif
                 }
                 else if (type == typeof(ushort))
                 {
 #if !UNITY_2021
-                    ConfigureField<UnsignedIntegerField, uint>(root, name, () => (uint)(ushort)getValue(), setValue == null ? null : val => setValue((ushort)(uint)val), ref update);
+                    ConfigureField<UnsignedIntegerField, uint, ushort>(root, name, getValue, setValue, ref update);
 #else
-                    ConfigureField<IntegerField, int>(root, name, () => (int)(ushort)getValue(), setValue == null ? null : val => setValue((ushort)(int)val), ref update);
+                    ConfigureField<IntegerField, int , ushort>(root, name, getValue, setValue, ref update);
 #endif
                 }
                 else if (type == typeof(long))
@@ -451,7 +460,7 @@ namespace Cjx.Unity.Netick.Editor
 #if !UNITY_2021
                     ConfigureField<UnsignedLongField, ulong>(root, name, getValue, setValue, ref update);
 #else
-                    ConfigureField<LongField, long>(root, name, () => (long)(ulong)getValue(), setValue == null ? null : val => setValue((ulong)(long)val), ref update);
+                    ConfigureField<LongField,long,ulong>(root, name, getValue, setValue, ref update);
 #endif
                 }
                 else if (type == typeof(float))
@@ -532,6 +541,25 @@ namespace Cjx.Unity.Netick.Editor
                 {
                     ConfigureField<TextField, string>(root, name, () => getValue().ToString(), setValue == null ? null : val => setValue(Activator.CreateInstance(type, val)), ref update);
                 }
+                else if (type.FullName.StartsWith("Netick.NetworkArrayStruct"))
+                {
+                    var bufferField = type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).First();
+                    Action<object> set = setValue == null ? null : val =>
+                    {
+                        var source = getValue();
+                        bufferField.SetValue(source, val);
+                        setValue(source);
+                    };
+                    var content = Configure(bufferField.FieldType, () => bufferField.GetValue(getValue()), set, setValue != null , ref update);
+                    var foldOut = new Foldout();
+                    foldOut.text = name;
+                    foldOut.Add(content);
+                    root.Add(foldOut);
+                    if(setValue == null)
+                    {
+                        foldOut.Q<Label>().style.color = Color.grey;
+                    }
+                }
                 else if (type.FullName.StartsWith("Netick.FixedSize"))
                 {
                     Action lsUpdate = null;
@@ -596,7 +624,8 @@ namespace Cjx.Unity.Netick.Editor
 
                     if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(NetworkBehaviourRef<>))
                     {
-                        var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () => {
+                        var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () =>
+                        {
                             var md = type.GetMethods().First(x => x.Name == "GetBehaviour" && !x.ContainsGenericParameters);
                             var rootVisual = root;
                             NetworkBehaviour targetObj = null;
@@ -611,15 +640,17 @@ namespace Cjx.Unity.Netick.Editor
                             }
                             var br = targetObj ? md?.Invoke(getValue(), new[] { targetObj.Sandbox }) : null;
                             return br;
-                        }, val => { 
-                            setValue(Activator.CreateInstance(type,val));
+                        }, val =>
+                        {
+                            setValue(Activator.CreateInstance(type, val));
                         }, ref update);
                         field.objectType = type.GenericTypeArguments.FirstOrDefault();
                         name += " (Raw)";
                     }
-                    else if(type == typeof(NetworkObjectRef))
+                    else if (type == typeof(NetworkObjectRef))
                     {
-                        var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () => {
+                        var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () =>
+                        {
                             var md = type.GetMethods().First(x => x.Name == "GetObject");
                             var rootVisual = root;
                             NetworkBehaviour targetObj = null;
@@ -634,7 +665,8 @@ namespace Cjx.Unity.Netick.Editor
                             }
                             var br = targetObj ? md?.Invoke(getValue(), new[] { targetObj.Sandbox }) : null;
                             return br;
-                        }, val => {
+                        }, val =>
+                        {
                             setValue(Activator.CreateInstance(type, val));
                         }, ref update);
                         field.objectType = typeof(NetworkObject);
@@ -654,7 +686,7 @@ namespace Cjx.Unity.Netick.Editor
                         foldOut.text = name;
                         foldOut.Add(content);
                         foldOut.value = false;
-                        if(setValue == null)
+                        if (setValue == null)
                         {
                             foldOut.Q<Label>().style.color = Color.grey;
                         }
@@ -677,7 +709,8 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (typeof(UnityEngine.Object).IsAssignableFrom(type))
                 {
-                    ConfigureField<ObjectField, UnityEngine.Object>(root, name, getValue, setValue, ref update);
+                    var fd = ConfigureField<ObjectField, UnityEngine.Object>(root, name, getValue, setValue, ref update);
+                    fd.objectType = type;
                 }
                 else if (typeof(IEnumerable).IsAssignableFrom(type))
                 {
