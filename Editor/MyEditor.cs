@@ -539,7 +539,8 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (type.FullName.StartsWith("Netick.NetworkString"))
                 {
-                    ConfigureField<TextField, string>(root, name, () => getValue().ToString(), setValue == null ? null : val => setValue(Activator.CreateInstance(type, val)), ref update);
+                    var fd = ConfigureField<TextField, string>(root, name, () => getValue().ToString(), setValue == null ? null : val => setValue(Activator.CreateInstance(type, val)), ref update);
+                    fd.maxLength = int.Parse(type.Name.Substring("NetworkString".Length));
                 }
                 else if (type.FullName.StartsWith("Netick.NetworkArrayStruct"))
                 {
