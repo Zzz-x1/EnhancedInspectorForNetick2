@@ -41,9 +41,11 @@ namespace Cjx.Unity.Netick.Editor
             var dict = dictField.GetValue(cache);
             var storage = Activator.CreateInstance(dict.GetType().GetGenericArguments()[1]);
             var lsField = storage.GetType().GetField("customEditors");
+            var multilsField = storage.GetType().GetField("customEditorsMultiEdition");
             var lsType = lsField.FieldType;
             var lsInst = Activator.CreateInstance(lsType);
             lsField.SetValue(storage, lsInst);
+            multilsField.SetValue(storage, lsInst);
             var monoEditorInst = Activator.CreateInstance(lsType.GetGenericArguments()[0], new object[] { typeof(MyEditor), null, true, false });
             lsType.GetMethod("Add").Invoke(lsInst, new[] { monoEditorInst });
             var addMd = dictField.FieldType.GetMethod("Add");
