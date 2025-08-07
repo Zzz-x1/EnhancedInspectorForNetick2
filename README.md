@@ -9,5 +9,5 @@
 ### Features
 - Provider inspector that can read / write to network state during runtime for debugging
 - Support add PropertyAttribute to the backing field of network property.
-- Support PropertyDrawer implement with VisualElement
-  
+- Compatible with custom property drawer
+- ButtonAttribute for any method(support arguments)
