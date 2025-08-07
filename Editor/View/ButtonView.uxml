@@ -2,7 +2,7 @@
     <ui:VisualElement name="VisualElement" style="flex-grow: 1; margin-bottom: 8px;">
         <ui:VisualElement style="flex-grow: 0; flex-direction: row; background-color: rgba(0, 0, 0, 0.2); padding-left: 3px; width: auto; height: 30px;">
             <ui:Label text="Hello World! From UXML" name="name" style="flex-grow: 1; -unity-text-align: middle-left;" />
-            <ui:Button text="&gt;" parse-escape-sequences="true" display-tooltip-when-elided="true" name="Button" style="width: 30px;" />
+            <ui:Button text="&gt;" parse-escape-sequences="true" display-tooltip-when-elided="true" name="Button" style="width: 30px; -unity-font-style: bold; font-size: 15px;" />
         </ui:VisualElement>
         <ui:VisualElement name="args" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.1); margin-left: 0; padding-left: 10px;" />
     </ui:VisualElement>
