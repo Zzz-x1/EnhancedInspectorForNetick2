@@ -646,6 +646,7 @@ namespace Cjx.Unity.Netick.Editor
                             setValue(Activator.CreateInstance(type, val));
                         }, ref update);
                         field.objectType = type.GenericTypeArguments.FirstOrDefault();
+                        field.SetEnabled(setValue != null);
                         name += " (Raw)";
                     }
                     else if (type == typeof(NetworkObjectRef))
@@ -671,6 +672,7 @@ namespace Cjx.Unity.Netick.Editor
                             setValue(Activator.CreateInstance(type, val));
                         }, ref update);
                         field.objectType = typeof(NetworkObject);
+                        field.SetEnabled(setValue != null);
                         name += " (Raw)";
                     }
 
