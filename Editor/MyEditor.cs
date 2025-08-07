@@ -294,7 +294,8 @@ namespace Cjx.Unity.Netick.Editor
         private unsafe void CreateDebugEditor(VisualElement root)
         {
             root.Add(CreateSplitLine());
-            var foldOut = CreateFoldOut("Network State (Runtime)");
+            var netRole = ((NetworkBehaviour)target).IsServer ? "Server" : "Client";
+            var foldOut = CreateFoldOut($"Network State (Runtime) ({netRole})");
             Action update = null;
             var content = EditorEx.Configure(target.GetType(), () => target, null , target is NetworkBehaviour nb && nb.IsServer , ref update);
             foldOut.Add(content);
@@ -622,7 +623,6 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (!type.IsPrimitive)
                 {
-
                     if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(NetworkBehaviourRef<>))
                     {
                         var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () =>
@@ -675,7 +675,6 @@ namespace Cjx.Unity.Netick.Editor
                         field.SetEnabled(setValue != null);
                         name += " (Raw)";
                     }
-
                     var content = Configure(type, getValue, setValue, setValue != null, ref update);
                     bool needFoldOut = true;
                     if (type.IsConstructedGenericType && typeof(KeyValuePair<,>) == type.GetGenericTypeDefinition())
