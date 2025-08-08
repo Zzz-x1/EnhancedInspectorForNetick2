@@ -13,7 +13,8 @@
 ### Preview
 - Inspector
 <img width="573" height="812" alt="image" src="https://github.com/user-attachments/assets/f3931831-9c30-49e2-ac18-7d9c62f7bf4d" />
-<img width="576" height="519" alt="image" src="https://github.com/user-attachments/assets/4bb21d44-a206-49f7-b19d-0e4f110582e1" />
+<img width="508" height="757" alt="image" src="https://github.com/user-attachments/assets/61bc329a-ba6f-40de-b815-4cf2bb7d5061" />
+
 
 - ButtonAttribute
 ```C#
