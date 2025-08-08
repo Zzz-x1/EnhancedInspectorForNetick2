@@ -5,7 +5,7 @@
 - Open the Unity Package Manager by navigating to Window > Package Manager along the top bar.
 - Click the plus icon.
 - Select Add package from git URL
-- Enter https://github.com/Zzz-x1/EnhancedInspectorForNetick2.git
+- Enter ```https://github.com/Zzz-x1/EnhancedInspectorForNetick2.git```
 ### Features
 - View network state and modify network properties via inspector
 - Compatible with custom property drawer
