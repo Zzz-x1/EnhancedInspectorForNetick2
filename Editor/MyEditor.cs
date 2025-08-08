@@ -682,6 +682,10 @@ namespace Cjx.Unity.Netick.Editor
                     if (type.IsConstructedGenericType && typeof(KeyValuePair<,>) == type.GetGenericTypeDefinition())
                     {
                         content.style.flexDirection = new StyleEnum<FlexDirection>(FlexDirection.Row);
+                        foreach(var child in content.Children())
+                        {
+                            child.style.flexGrow = 1;
+                        }
                         needFoldOut = false;
                     }
                     if (needFoldOut)
