@@ -1,10 +1,7 @@
 [![Unity 2021.3+](https://img.shields.io/badge/unity-2021.3%2B-blue.svg)](https://unity3d.com/get-unity/download)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://github.com/Zzz-x1/EnhancedInspectorForNetick2/blob/main/LICENSE)
 
-### Prerequisites
-- Unity Editor 2021.3 or higher
-
-### Steps
+### Installation
 - Open the Unity Package Manager by navigating to Window > Package Manager along the top bar.
 - Click the plus icon.
 - Select Add package from git URL
