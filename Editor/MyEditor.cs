@@ -724,9 +724,17 @@ namespace Cjx.Unity.Netick.Editor
                 {
                     int displayCount = 0;
                     Action lsUpdate = null;
-                    update += () => lsUpdate?.Invoke();
                     List<object> source = new List<object>();
                     var ls = new ListView();
+                    update += () => {
+                        foreach (var child in ls.Children())
+                        {
+                            if(child.userData is Action a)
+                            {
+                                a?.Invoke();
+                            }
+                        }
+                    };
                     ls.virtualizationMethod = CollectionVirtualizationMethod.DynamicHeight;
                     ls.makeItem = () =>
                     {
@@ -739,13 +747,10 @@ namespace Cjx.Unity.Netick.Editor
                         Action itemUpdate = null;
                         AddDisplayItem(v, $"Element{i}", elementType, () => source[i], null, ref itemUpdate);
                         v.userData = itemUpdate;
-                        lsUpdate += itemUpdate;
                     };
                     ls.unbindItem = (v, i) =>
                     {
                         v.Clear();
-                        Action updateItem = v.userData as Action;
-                        lsUpdate -= updateItem;
                     };
                     update += () =>
                     {
