@@ -94,6 +94,32 @@ namespace Cjx.Unity.Netick.Editor
         }
     }
 
+    public class GenericBinding : IBinding
+    {
+        public Action action;
+
+        public void PreUpdate()
+        {
+
+        }
+
+        public void Release()
+        {
+
+        }
+
+        public void Update()
+        {
+            action?.Invoke();
+        }
+
+        public static GenericBinding Create(Action a)
+        {
+            return new GenericBinding { action = a };
+        }
+    }
+
+
     [CustomPropertyDrawer(typeof(NetworkBool))]
     public class NetworkBoolPropertyDrawer : PropertyDrawer
     {
@@ -121,7 +147,7 @@ namespace Cjx.Unity.Netick.Editor
 
         public unsafe override VisualElement CreateInspectorGUI()
         {
-
+            _buttonAsset = buttonAsset;
             var root = new VisualElement();
             root.userData = target;
             DefaultInspector(root);
@@ -189,6 +215,48 @@ namespace Cjx.Unity.Netick.Editor
                     foldOut.Add(item);
                 }
             }
+        }
+
+        static VisualTreeAsset _buttonAsset;
+
+        public static VisualElement AddFunction(object target, MethodInfo method , VisualTreeAsset buttonAsset = null)
+        {
+            if (buttonAsset == null) {
+                buttonAsset = _buttonAsset;
+            }
+            var item = buttonAsset.Instantiate();
+            var btn = item.Q<Button>();
+            var argsContent = item.Q("args");
+            btn.text = ">";
+            object[] args = new object[method.GetParameters().Length];
+
+            btn.clicked += () => {
+                method.Invoke(method.IsStatic ? null : target, args);
+            };
+
+            Action update = null;
+
+            var @params = method.GetParameters();
+            for (int i = 0; i < @params.Length; i++)
+            {
+                var index = i;
+                var param = @params[i];
+                if (param.ParameterType == typeof(string))
+                {
+                    args[i] = string.Empty;
+                }
+                else
+                {
+                    if (param.ParameterType.IsValueType)
+                    {
+                        args[i] = Activator.CreateInstance(param.ParameterType);
+                    }
+                }
+                EditorEx.AddDisplayItem(argsContent, param.Name, param.ParameterType, () => args[index], x => args[index] = x, ref update);
+            }
+            item.Q<Label>().text = method.Name;
+            update?.Invoke();
+            return item;
         }
 
         private void DefaultInspector(VisualElement root)
@@ -328,7 +396,7 @@ namespace Cjx.Unity.Netick.Editor
 
         public static VisualElement Configure(Type type, Func<object> targetGet, Action<object> targetSet, bool writable, ref Action update)
         {
-            object source = null;
+            object source = targetGet?.Invoke();
 
             update += () =>
             {
@@ -726,36 +794,31 @@ namespace Cjx.Unity.Netick.Editor
                     Action lsUpdate = null;
                     List<object> source = new List<object>();
                     var ls = new ListView();
-                    update += () => {
-                        foreach (var child in ls.Children())
-                        {
-                            if(child.userData is Action a)
-                            {
-                                a?.Invoke();
-                            }
-                        }
-                    };
                     ls.virtualizationMethod = CollectionVirtualizationMethod.DynamicHeight;
                     ls.makeItem = () =>
                     {
-                        var item = new VisualElement();
-                        return item;
+                        return new VisualElement();
                     };
                     var elementType = type.GetInterface("IEnumerable`1").GetGenericArguments()[0];
                     ls.bindItem = (v, i) =>
                     {
                         Action itemUpdate = null;
                         AddDisplayItem(v, $"Element{i}", elementType, () => source[i], null, ref itemUpdate);
-                        v.userData = itemUpdate;
+                        v.userData =  v.schedule.Execute(itemUpdate).Every(0);
                     };
                     ls.unbindItem = (v, i) =>
                     {
                         v.Clear();
+                        if(v.userData is IVisualElementScheduledItem scheduledItem)
+                        {
+                            scheduledItem.Pause();
+                        }
                     };
                     update += () =>
                     {
                         source.Clear();
                         var buffer = (getValue() as IEnumerable).GetEnumerator();
+
                         while (buffer.MoveNext())
                         {
                             source.Add(buffer.Current);
@@ -777,6 +840,17 @@ namespace Cjx.Unity.Netick.Editor
                     scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
                     scroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
                     scroll.style.maxHeight = new StyleLength(240);
+                    var methodsToExpose = new[] {
+                        "Add","Remove","Enqueue","Dequeue","Push","Pop","Clear"
+                    };
+
+                    foreach (var method in methodsToExpose)
+                    {
+                        if (type.GetMethods().FirstOrDefault(x => x.Name == method) is MethodInfo addMd)
+                        {
+                            foldOut.Add(MyEditor.AddFunction(getValue(), addMd));
+                        }
+                    }
                 }
             }
         }
