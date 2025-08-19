@@ -495,7 +495,7 @@ namespace Cjx.Unity.Netick.Editor
 #if !UNITY_2021
                     ConfigureField<UnsignedIntegerField, uint>(root, name, getValue, setValue);
 #else
-                    ConfigureField<IntegerField,int, uint>(root, name, getValue, setValue, ref update);
+                    ConfigureField<IntegerField,int, uint>(root, name, getValue, setValue);
 #endif
                 }
                 else if (type == typeof(ushort))
@@ -503,7 +503,7 @@ namespace Cjx.Unity.Netick.Editor
 #if !UNITY_2021
                     ConfigureField<UnsignedIntegerField, uint, ushort>(root, name, getValue, setValue);
 #else
-                    ConfigureField<IntegerField, int , ushort>(root, name, getValue, setValue, ref update);
+                    ConfigureField<IntegerField, int , ushort>(root, name, getValue, setValue);
 #endif
                 }
                 else if (type == typeof(long))
@@ -515,7 +515,7 @@ namespace Cjx.Unity.Netick.Editor
 #if !UNITY_2021
                     ConfigureField<UnsignedLongField, ulong>(root, name, getValue, setValue);
 #else
-                    ConfigureField<LongField,long,ulong>(root, name, getValue, setValue, ref update);
+                    ConfigureField<LongField,long,ulong>(root, name, getValue, setValue);
 #endif
                 }
                 else if (type == typeof(float))
