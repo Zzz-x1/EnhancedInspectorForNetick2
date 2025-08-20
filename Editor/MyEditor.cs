@@ -3,8 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+#if NETICK
 using Netick;
 using Netick.Unity;
+#endif
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -13,6 +15,8 @@ using UnityEngine.UIElements;
 namespace Cjx.Unity.Netick.Editor
 {
     using Editor = UnityEditor.Editor;
+
+#if NETICK
 
     [InitializeOnLoad]
     internal static class Entry
@@ -59,7 +63,7 @@ namespace Cjx.Unity.Netick.Editor
             var o = typeof(Editor).Assembly.GetType("UnityEditor.CustomEditorAttributes");//
             var dictField = o.GetField("kSCustomEditors", BindingFlags.Static | BindingFlags.NonPublic);
             var dictField2 = o.GetField("kSCustomMultiEditors", BindingFlags.Static | BindingFlags.NonPublic);
-            
+
             var dict = dictField.GetValue(null);
             var dict2 = dictField2.GetValue(null);
 
@@ -92,34 +96,10 @@ namespace Cjx.Unity.Netick.Editor
             removeMd.Invoke(dict2, new[] { typeof(NetworkBehaviour) });
             addMd.Invoke(dict2, new object[] { typeof(NetworkBehaviour), lsInst });
         }
-    }
+    } 
+#endif
 
-    public class GenericBinding : IBinding
-    {
-        public Action action;
-
-        public void PreUpdate()
-        {
-
-        }
-
-        public void Release()
-        {
-
-        }
-
-        public void Update()
-        {
-            action?.Invoke();
-        }
-
-        public static GenericBinding Create(Action a)
-        {
-            return new GenericBinding { action = a };
-        }
-    }
-
-
+#if NETICK
     [CustomPropertyDrawer(typeof(NetworkBool))]
     public class NetworkBoolPropertyDrawer : PropertyDrawer
     {
@@ -127,14 +107,16 @@ namespace Cjx.Unity.Netick.Editor
         {
             var field = new Toggle();
             field.label = property.displayName;
-            field.RegisterValueChangedCallback(e => {
+            field.RegisterValueChangedCallback(e =>
+            {
                 property.FindPropertyRelative("RawValue").intValue = e.newValue ? 1 : 0;
             });
             field.value = property.FindPropertyRelative("RawValue").intValue != 0;
-            EditorEx.ConfigureStyle<Toggle,bool>(field);
+            EditorEx.ConfigureStyle<Toggle, bool>(field);
             return field;
         }
-    }
+    } 
+#endif
 
     [CanEditMultipleObjects]
     [CustomEditor(typeof(MonoBehaviour),true)]
@@ -151,13 +133,15 @@ namespace Cjx.Unity.Netick.Editor
             root.userData = target;
             DefaultInspector(root);
 
+#if NETICK
             if (targets.Length == 1)
             {
                 if (target is NetworkBehaviour nb && nb.StatePtr != null)
                 {
                     CreateDebugEditor(root);
                 }
-            }
+            } 
+#endif
             AddButtons(root);
 
             return root;
@@ -284,6 +268,12 @@ namespace Cjx.Unity.Netick.Editor
                 root.Add(defaultContent);
             }
 
+            AddNetworkProperties(root);
+        }
+
+        private void AddNetworkProperties(VisualElement root)
+        {
+#if NETICK
             var networkProperties = CreateFoldOut("Network Properties");
             var serializedObject = new SerializedObject(target);
             serializedObject.forceChildVisibility = true;
@@ -310,7 +300,8 @@ namespace Cjx.Unity.Netick.Editor
                                 networkProperties.Add(propertyField);
                             }
                         }
-                    }catch (Exception e)
+                    }
+                    catch (Exception e)
                     {
                         Debug.LogException(e);
                     }
@@ -321,7 +312,8 @@ namespace Cjx.Unity.Netick.Editor
             {
                 root.Add(CreateSplitLine());
                 root.Add(networkProperties);
-            }
+            } 
+#endif
         }
 
         private VisualElement CreateTitle(string text, Color? color = null)
@@ -362,13 +354,15 @@ namespace Cjx.Unity.Netick.Editor
 
         private unsafe void CreateDebugEditor(VisualElement root)
         {
+#if NETICK
             root.Add(CreateSplitLine());
             var netRole = ((NetworkBehaviour)target).IsServer ? "Server" : "Client";
             var foldOut = CreateFoldOut($"Network State (Runtime) ({netRole})");
             Action update = null;
             var content = EditorEx.Configure(target.GetType(), () => target, null, target is NetworkBehaviour nb && nb.IsServer);
             foldOut.Add(content);
-            root.Add(foldOut);
+            root.Add(foldOut); 
+#endif
         }
     }
 
@@ -388,6 +382,7 @@ namespace Cjx.Unity.Netick.Editor
             {
                 source = targetGet();
             }).Every(0);
+#if NETICK
             bool isNetworkBehaviour = typeof(NetworkBehaviour).IsAssignableFrom(type);
 
             if (isNetworkBehaviour && type.BaseType != typeof(NetworkBehaviour))
@@ -407,20 +402,7 @@ namespace Cjx.Unity.Netick.Editor
                 AddDisplayItem(root, prop.Name, prop.PropertyType, () => prop.GetValue(source), set);
             }
 
-            if (!isNetworkBehaviour)
-            {
-                foreach (var field in type.GetFields(All))
-                {
-                    Action<object> set = !writable || (type.IsValueType && targetSet == null) ? null : val =>
-                    {
-                        source = targetGet();
-                        field.SetValue(source, val);
-                        targetSet?.Invoke(source);
-                    };
-                    AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), set);
-                }
-            }
-            else
+            if (isNetworkBehaviour)
             {
                 foreach (var field in type.GetFields(All).Where(x => x.CustomAttributes.Any(x => x.AttributeType == typeof(Networked))))
                 {
@@ -432,6 +414,22 @@ namespace Cjx.Unity.Netick.Editor
                     AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), set);
                 }
             }
+            else
+            { 
+#endif
+            foreach (var field in type.GetFields(All))
+                {
+                    Action<object> set = !writable || (type.IsValueType && targetSet == null) ? null : val =>
+                    {
+                        source = targetGet();
+                        field.SetValue(source, val);
+                        targetSet?.Invoke(source);
+                    };
+                    AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), set);
+                }
+#if NETICK
+        }  
+#endif
             return root;
         }
 
@@ -566,10 +564,12 @@ namespace Cjx.Unity.Netick.Editor
                 {
                     ConfigureField<Toggle, bool>(root, name, getValue, setValue);
                 }
+#if NETICK
                 else if (type == typeof(NetworkBool))
                 {
                     ConfigureField<Toggle, bool>(root, name, () => (bool)(NetworkBool)getValue(), setValue == null ? null : val => setValue((bool)(NetworkBool)val));
-                }
+                } 
+#endif
                 else if (type == typeof(Quaternion))
                 {
                     ConfigureField<Vector4Field, Vector4>(root, name, () =>
@@ -668,6 +668,7 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 else if (!type.IsPrimitive)
                 {
+#if NETICK
                     if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(NetworkBehaviourRef<>))
                     {
                         var field = ConfigureField<ObjectField, UnityEngine.Object>(root, name, () =>
@@ -719,7 +720,8 @@ namespace Cjx.Unity.Netick.Editor
                         field.objectType = typeof(NetworkObject);
                         field.SetEnabled(setValue != null);
                         name += " (Raw)";
-                    }
+                    } 
+#endif
                     var content = Configure(type, getValue, setValue, setValue != null);
                     bool needFoldOut = true;
                     if (type.IsConstructedGenericType && typeof(KeyValuePair<,>) == type.GetGenericTypeDefinition())

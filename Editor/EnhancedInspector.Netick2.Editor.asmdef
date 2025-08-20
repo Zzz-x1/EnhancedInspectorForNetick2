@@ -16,6 +16,12 @@
     ],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.karrar.netick",
+            "expression": "0",
+            "define": "NETICK"
+        }
+    ],
     "noEngineReferences": false
 }
