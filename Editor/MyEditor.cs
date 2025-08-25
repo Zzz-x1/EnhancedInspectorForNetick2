@@ -358,7 +358,6 @@ namespace Cjx.Unity.Netick.Editor
             root.Add(CreateSplitLine());
             var netRole = ((NetworkBehaviour)target).IsServer ? "Server" : "Client";
             var foldOut = CreateFoldOut($"Network State (Runtime) ({netRole})");
-            Action update = null;
             var content = EditorEx.Configure(target.GetType(), () => target, null, target is NetworkBehaviour nb && nb.IsServer);
             foldOut.Add(content);
             root.Add(foldOut); 
@@ -768,7 +767,6 @@ namespace Cjx.Unity.Netick.Editor
                 else if (typeof(IEnumerable).IsAssignableFrom(type))
                 {
                     int displayCount = 0;
-                    Action lsUpdate = null;
                     List<object> source = new List<object>();
                     var ls = new ListView();
                     ls.virtualizationMethod = CollectionVirtualizationMethod.DynamicHeight;
