@@ -119,7 +119,7 @@ namespace Cjx.Unity.Netick.Editor
 #endif
 
     [CanEditMultipleObjects]
-    [CustomEditor(typeof(MonoBehaviour),true)]
+    [CustomEditor(typeof(UnityEngine.Object),true)]
     internal class MyEditor : Editor
     {
 
@@ -274,6 +274,10 @@ namespace Cjx.Unity.Netick.Editor
         private void AddNetworkProperties(VisualElement root)
         {
 #if NETICK
+            if(target is not NetworkBehaviour)
+            {
+                return;
+            }
             var networkProperties = CreateFoldOut("Network Properties");
             var serializedObject = new SerializedObject(target);
             serializedObject.forceChildVisibility = true;
