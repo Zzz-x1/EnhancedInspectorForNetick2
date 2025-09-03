@@ -14,6 +14,7 @@ using UnityEngine.UIElements;
 
 namespace Cjx.Unity.Netick.Editor
 {
+    using static UnityEngine.UIElements.VisualElement;
     using Editor = UnityEditor.Editor;
 
 #if NETICK
@@ -128,7 +129,6 @@ namespace Cjx.Unity.Netick.Editor
 
         public unsafe override VisualElement CreateInspectorGUI()
         {
-            _buttonAsset = buttonAsset;
             var root = new VisualElement();
             root.userData = target;
             DefaultInspector(root);
@@ -143,8 +143,70 @@ namespace Cjx.Unity.Netick.Editor
             } 
 #endif
             AddButtons(root);
-
+            Optional(root);
             return root;
+        }
+
+        private void Optional(VisualElement root)
+        {
+            var toogle = new Toggle();
+            toogle.text = "Debug Mode";
+            var label = toogle.Q<Label>();
+            var hierarchy = label.parent.hierarchy;
+            label.RemoveFromHierarchy();
+            hierarchy.Insert(0, label);
+            root.Add(toogle);
+            toogle.RegisterValueChangedCallback(evt => {
+                if (evt.newValue)
+                {
+                    toogle.RemoveFromHierarchy();
+                    var search = new TextField();
+                    root.Add(CreateSplitLine());
+                    var foldOut = CreateFoldOut("Debug");
+                    root.Add(foldOut);
+                    foldOut.Add(search);
+                    Dictionary<string, VisualElement> dict = new Dictionary<string, VisualElement>();
+                    foreach(var md in target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Instance))
+                    {
+                        if (md.Name.StartsWith("get_"))
+                        {
+                            continue;
+                        }
+                        if (md.IsGenericMethod)
+                        {
+                            continue;
+                        }
+                        if (md.GetParameters().Any(x => x.ParameterType.IsGenericParameter || (!x.ParameterType.IsValueType && !typeof(UnityEngine.Object).IsAssignableFrom(x.ParameterType))))
+                        {
+                            continue;
+                        }
+                        try
+                        {
+                            var item = CreateFunctionItem(targets, md, buttonAsset);
+                            foldOut.Add(item);
+                            dict.Add(md.ToString(), item);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogException(ex);
+                        }
+                    }
+                    search.RegisterValueChangedCallback(evt => { 
+                        foreach(var pair in dict)
+                        {
+                            if (string.IsNullOrEmpty(pair.Key))
+                            {
+                                pair.Value.style.display = new StyleEnum<DisplayStyle>(DisplayStyle.Flex);
+                            }
+                            else
+                            {
+                                pair.Value.style.display = !pair.Key.Contains(evt.newValue, StringComparison.OrdinalIgnoreCase) ? new StyleEnum<DisplayStyle>(DisplayStyle.None) : new StyleEnum<DisplayStyle>(DisplayStyle.Flex);
+                            }
+      
+                        }
+                    });
+                }
+            });
         }
 
         private void AddButtons(VisualElement root)
@@ -160,58 +222,19 @@ namespace Cjx.Unity.Netick.Editor
                 root.Add(foldOut);
                 foreach (var method in methods)
                 {
-                    var item = buttonAsset.Instantiate();
-                    var btn = item.Q<Button>();
-                    var argsContent = item.Q("args");
-                    btn.text = ">";
-                    object[] args = new object[method.GetParameters().Length];
-
-                    btn.clicked += () => {
-                        foreach (var t in targets)
-                        {
-                            method.Invoke(method.IsStatic ? null : t, args);
-                        }
-                    };
-
-                    Action update = null;
-
-                    var @params = method.GetParameters();
-                    for (int i = 0; i < @params.Length; i++)
-                    {
-                        var index = i;
-                        var param = @params[i];
-                        if (param.ParameterType == typeof(string))
-                        {
-                            args[i] = string.Empty;
-                        }
-                        else
-                        {
-                            if (param.ParameterType.IsValueType)
-                            {
-                                args[i] = Activator.CreateInstance(param.ParameterType);
-                            }
-                        }
-                        EditorEx.AddDisplayItem(argsContent, param.Name, param.ParameterType, () => args[index], x => args[index] = x);
-                    }
-                    item.Q<Label>().text = method.Name;
-                    update?.Invoke();
+                    var item = CreateFunctionItem(targets, method, buttonAsset);
                     foldOut.Add(item);
                 }
             }
         }
 
-        static VisualTreeAsset _buttonAsset;
-
-        public static VisualElement AddFunction(object target, MethodInfo method , VisualTreeAsset buttonAsset = null)
+        public static VisualElement CreateFunctionItem(object target, MethodInfo method , VisualTreeAsset buttonAsset)
         {
-            if (buttonAsset == null) {
-                buttonAsset = _buttonAsset;
-            }
             var item = buttonAsset.Instantiate();
             var btn = item.Q<Button>();
             var argsContent = item.Q("args");
             btn.text = ">";
-            object[] args = new object[method.GetParameters().Length];
+            object[] args = method.GetParameters().Select(x => x.DefaultValue).ToArray();
 
             btn.clicked += () => {
                 method.Invoke(method.IsStatic ? null : target, args);
@@ -227,6 +250,50 @@ namespace Cjx.Unity.Netick.Editor
                 if (param.ParameterType == typeof(string))
                 {
                     args[i] = string.Empty;
+                }
+                else
+                {
+                    if (param.ParameterType.IsValueType)
+                    {
+                        args[i] = Activator.CreateInstance(param.ParameterType);
+                    }
+                }
+                EditorEx.AddDisplayItem(argsContent, param.Name, param.ParameterType, () => args[index], x => args[index] = x);
+            }
+            item.Q<Label>().text = method.Name;
+            update?.Invoke();
+            return item;
+        }
+
+        public static VisualElement CreateFunctionItem(object[] targets, MethodInfo method, VisualTreeAsset buttonAsset)
+        {
+            var item = buttonAsset.Instantiate();
+            var btn = item.Q<Button>();
+            var argsContent = item.Q("args");
+            btn.text = ">";
+            object[] args = method.GetParameters().Select(x => x.DefaultValue).ToArray();
+
+            btn.clicked += () => {
+                foreach (var target in targets)
+                {
+                    method.Invoke(method.IsStatic ? null : target, args);
+                }
+            };
+
+            Action update = null;
+
+            var @params = method.GetParameters();
+            for (int i = 0; i < @params.Length; i++)
+            {
+                var index = i;
+                var param = @params[i];
+                if (param.ParameterType == typeof(string))
+                {
+                    args[i] = string.Empty;
+                }
+                if (param.ParameterType.IsGenericParameter)
+                {
+                    continue;
                 }
                 else
                 {
@@ -453,7 +520,9 @@ namespace Cjx.Unity.Netick.Editor
             fd.schedule.Execute(() =>
             {
                 execChangeEvent = false;
-                fd.value = (TValue)getValue();
+                if (getValue() is TValue v) {
+                    fd.value = v;
+                }
                 execChangeEvent = true;
             }).Every(0);
             fd.SetEnabled(setValue != null);
@@ -790,7 +859,12 @@ namespace Cjx.Unity.Netick.Editor
                     ls.schedule.Execute(() =>
                     {
                         source.Clear();
-                        var buffer = (getValue() as IEnumerable).GetEnumerator();
+                        var buffer = (getValue() as IEnumerable)?.GetEnumerator();
+
+                        if(buffer == null)
+                        {
+                            return;
+                        }
 
                         while (buffer.MoveNext())
                         {
