@@ -3,9 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+
 #if NETICK
 using Netick;
 using Netick.Unity;
+
 #endif
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -14,7 +16,6 @@ using UnityEngine.UIElements;
 
 namespace Cjx.Unity.Netick.Editor
 {
-    using static UnityEngine.UIElements.VisualElement;
     using Editor = UnityEditor.Editor;
 
 #if NETICK
@@ -124,12 +125,38 @@ namespace Cjx.Unity.Netick.Editor
     internal class MyEditor : Editor
     {
 
+        static Dictionary<UnityEngine.Object, VisualElement> cached = new Dictionary<UnityEngine.Object, VisualElement>();
+
+        [InitializeOnLoadMethod]
+        [InitializeOnEnterPlayMode]
+        static void Init()
+        {
+            cached.Clear();
+            EditorApplication.playModeStateChanged += state => { 
+                cached.Clear();
+            };
+        }
+
         [SerializeField]
         VisualTreeAsset buttonAsset;
 
         public unsafe override VisualElement CreateInspectorGUI()
         {
-            var root = new VisualElement();
+
+            foreach(var invalid in cached.Keys.Where(x => !x).ToArray())
+            {
+                cached.Remove(invalid);
+            }
+
+/*            if(targets.Length == 1)
+            {
+                if(cached.TryGetValue(target, out var content))
+                {
+                    return content;
+                }
+            }*/
+
+            var root = new VisualElement();             
             root.userData = target;
             DefaultInspector(root);
 
@@ -144,6 +171,11 @@ namespace Cjx.Unity.Netick.Editor
 #endif
             AddButtons(root);
             Optional(root);
+
+            if(targets.Length == 1)
+            {
+                cached[targets[0]] = root;
+            }
             return root;
         }
 
@@ -240,8 +272,6 @@ namespace Cjx.Unity.Netick.Editor
                 method.Invoke(method.IsStatic ? null : target, args);
             };
 
-            Action update = null;
-
             var @params = method.GetParameters();
             for (int i = 0; i < @params.Length; i++)
             {
@@ -261,7 +291,6 @@ namespace Cjx.Unity.Netick.Editor
                 EditorEx.AddDisplayItem(argsContent, param.Name, param.ParameterType, () => args[index], x => args[index] = x);
             }
             item.Q<Label>().text = method.Name;
-            update?.Invoke();
             return item;
         }
 
@@ -279,8 +308,6 @@ namespace Cjx.Unity.Netick.Editor
                     method.Invoke(method.IsStatic ? null : target, args);
                 }
             };
-
-            Action update = null;
 
             var @params = method.GetParameters();
             for (int i = 0; i < @params.Length; i++)
@@ -305,7 +332,6 @@ namespace Cjx.Unity.Netick.Editor
                 EditorEx.AddDisplayItem(argsContent, param.Name, param.ParameterType, () => args[index], x => args[index] = x);
             }
             item.Q<Label>().text = method.Name;
-            update?.Invoke();
             return item;
         }
 
@@ -591,6 +617,26 @@ namespace Cjx.Unity.Netick.Editor
                 else if (type == typeof(float))
                 {
                     ConfigureField<FloatField, float>(root, name, getValue, setValue);
+
+/*                    ConfigureField<TextField, string>(root, name, () => {
+                        float value = (float)getValue();
+                        ref uint raw = ref UnsafeUtility.As<float, uint>(ref value);
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 31; i >= 0; i--)
+                        {
+                            var mask = 1u << i;
+                            if ((raw & mask) != 0)
+                            {
+                                sb.Append('1');
+                            }
+                            else
+                            {
+                                sb.Append('0');
+                            }
+                        }
+                        return sb.ToString();
+                    }, null);*/
+
                 }
                 else if (type == typeof(double))
                 {
