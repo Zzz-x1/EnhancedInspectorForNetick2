@@ -1,6 +1,6 @@
 {
   "name": "com.cjx.enhancedinspector-netick2",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "displayName": "EnhancedInspector-Netick2",
   "description": "visualize network states",
   "unity": "2021.3",

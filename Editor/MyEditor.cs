@@ -18,6 +18,8 @@ namespace Cjx.Unity.Netick.Editor
 {
     using Editor = UnityEditor.Editor;
 
+    internal class QuickDebugWindow : EditorWindow { }
+
 #if NETICK
 
     [InitializeOnLoad]
@@ -124,38 +126,11 @@ namespace Cjx.Unity.Netick.Editor
     [CustomEditor(typeof(UnityEngine.Object),true)]
     internal class MyEditor : Editor
     {
-
-        static Dictionary<UnityEngine.Object, VisualElement> cached = new Dictionary<UnityEngine.Object, VisualElement>();
-
-        [InitializeOnLoadMethod]
-        [InitializeOnEnterPlayMode]
-        static void Init()
-        {
-            cached.Clear();
-            EditorApplication.playModeStateChanged += state => { 
-                cached.Clear();
-            };
-        }
-
         [SerializeField]
         VisualTreeAsset buttonAsset;
 
         public unsafe override VisualElement CreateInspectorGUI()
         {
-
-            foreach(var invalid in cached.Keys.Where(x => !x).ToArray())
-            {
-                cached.Remove(invalid);
-            }
-
-/*            if(targets.Length == 1)
-            {
-                if(cached.TryGetValue(target, out var content))
-                {
-                    return content;
-                }
-            }*/
-
             var root = new VisualElement();             
             root.userData = target;
             DefaultInspector(root);
@@ -171,11 +146,6 @@ namespace Cjx.Unity.Netick.Editor
 #endif
             AddButtons(root);
             Optional(root);
-
-            if(targets.Length == 1)
-            {
-                cached[targets[0]] = root;
-            }
             return root;
         }
 
@@ -215,6 +185,14 @@ namespace Cjx.Unity.Netick.Editor
                         try
                         {
                             var item = CreateFunctionItem(targets, md, buttonAsset);
+                            var cmm = new ContextualMenuManipulator(e => {
+                                e.menu.AppendAction("Pin To Quick Debug Window", a => {
+                                    var w = EditorWindow.GetWindow<QuickDebugWindow>();
+                                    var item = CreateFunctionItem(targets, md, buttonAsset);
+                                    w.rootVisualElement.Add(item);
+                                });
+                            });
+                            item.AddManipulator(cmm);
                             foldOut.Add(item);
                             dict.Add(md.ToString(), item);
                         }
