@@ -168,7 +168,15 @@ namespace Cjx.Unity.Netick.Editor
                     root.Add(foldOut);
                     foldOut.Add(search);
                     Dictionary<string, VisualElement> dict = new Dictionary<string, VisualElement>();
-                    foreach(var md in target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Instance))
+                    HashSet<Type> except = new()
+                    {
+                        typeof(System.Object),
+                        typeof(UnityEngine.Object),
+                        typeof(UnityEngine.MonoBehaviour),
+                        typeof(UnityEngine.Component),
+                        typeof(UnityEngine.Behaviour)
+                    };
+                    foreach(var md in target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Instance).Where(x=>!except.Contains(x.DeclaringType)))
                     {
                         if (md.Name.StartsWith("get_"))
                         {
