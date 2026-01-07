@@ -7,6 +7,8 @@ using System.Reflection;
 #if NETICK
 using Netick;
 using Netick.Unity;
+using NetickEditor;
+
 
 #endif
 using UnityEditor;
@@ -18,121 +20,213 @@ namespace Cjx.Unity.Netick.Editor
 {
     using Editor = UnityEditor.Editor;
 
-    internal class QuickDebugWindow : EditorWindow { }
-
-#if NETICK
-
-    [InitializeOnLoad]
-    internal static class Entry
+#if ODIN_INSPECTOR && NETICK
+    [CanEditMultipleObjects]
+    [CustomEditor(typeof(NetworkBehaviour), true)]
+    public class NewNetworkBehaviourEditor : Sirenix.OdinInspector.Editor.OdinEditor
     {
-        static Entry()
-        {
-            EditorApplication.delayCall += Init;
-        }
 
-        static void Init()
-        {
-#if UNITY_6000_0_OR_NEWER
-            Init_6X();
-#else
-            Init_2022_X();
-#endif
-        }
-
-        private static void Init_6X()
-        {
-            var o = typeof(Editor).Assembly.GetType("UnityEditor.CustomEditorAttributes");//
-            var instanceGet = o.GetProperty("instance", BindingFlags.Static | BindingFlags.NonPublic);
-            var instance = instanceGet.GetValue(null);
-            var cache = instance.GetType().GetField("m_Cache", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(instance);
-            var dictField = cache.GetType().GetField("m_CustomEditorCache", BindingFlags.Instance | BindingFlags.NonPublic);
-            var dict = dictField.GetValue(cache);
-            var storage = Activator.CreateInstance(dict.GetType().GetGenericArguments()[1]);
-            var lsField = storage.GetType().GetField("customEditors");
-            var multilsField = storage.GetType().GetField("customEditorsMultiEdition");
-            var lsType = lsField.FieldType;
-            var lsInst = Activator.CreateInstance(lsType);
-            lsField.SetValue(storage, lsInst);
-            multilsField.SetValue(storage, lsInst);
-            var monoEditorInst = Activator.CreateInstance(lsType.GetGenericArguments()[0], new object[] { typeof(MyEditor), null, true, false });
-            lsType.GetMethod("Add").Invoke(lsInst, new[] { monoEditorInst });
-            var addMd = dictField.FieldType.GetMethod("Add");
-            var removeMd = dictField.FieldType.GetMethods().FirstOrDefault(x => x.Name == "Remove" && x.GetParameters().Length == 1);
-            removeMd.Invoke(dict, new[] { typeof(NetworkBehaviour) });
-            addMd.Invoke(dict, new object[] { typeof(NetworkBehaviour), storage });
-        }
-
-        private static void Init_2022_X()
-        {
-            var o = typeof(Editor).Assembly.GetType("UnityEditor.CustomEditorAttributes");//
-            var dictField = o.GetField("kSCustomEditors", BindingFlags.Static | BindingFlags.NonPublic);
-            var dictField2 = o.GetField("kSCustomMultiEditors", BindingFlags.Static | BindingFlags.NonPublic);
-
-            var dict = dictField.GetValue(null);
-            var dict2 = dictField2.GetValue(null);
-
-            var listType = dict.GetType().GetGenericArguments()[1];
-            var monoEditorType = listType.GetGenericArguments()[0];
-            var bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-            var m_InspectedTypeField = monoEditorType.GetField("m_InspectedType", bindingFlags);
-            var m_InspectorTypeField = monoEditorType.GetField("m_InspectorType", bindingFlags);
-            var m_RenderPipelineTypeField = monoEditorType.GetField("m_RenderPipelineType", bindingFlags);
-            var m_EditorForChildClassesField = monoEditorType.GetField("m_EditorForChildClasses", bindingFlags);
-            var m_IsFallbackField = monoEditorType.GetField("m_IsFallback", bindingFlags);
-            var monoEditorTypeInst = Activator.CreateInstance(monoEditorType);
-
-            m_InspectedTypeField.SetValue(monoEditorTypeInst, typeof(NetworkBehaviour));
-            m_InspectorTypeField.SetValue(monoEditorTypeInst, typeof(MyEditor));
-            //m_RenderPipelineTypeField.SetValue(monoEditorTypeInst, GraphicsSettings.defaultRenderPipeline.GetType());
-            m_EditorForChildClassesField.SetValue(monoEditorTypeInst, true);
-            m_IsFallbackField.SetValue(monoEditorTypeInst, false);
-
-            var lsInst = Activator.CreateInstance(listType);
-            listType.GetMethod("Add").Invoke(lsInst, new[] { monoEditorTypeInst });
-
-            var addMd = dictField.FieldType.GetMethod("Add");
-
-            var removeMd = dictField.FieldType.GetMethods().FirstOrDefault(x => x.Name == "Remove" && x.GetParameters().Length == 1);
-
-            removeMd.Invoke(dict, new[] { typeof(NetworkBehaviour) });
-            addMd.Invoke(dict, new object[] { typeof(NetworkBehaviour), lsInst });
-
-            removeMd.Invoke(dict2, new[] { typeof(NetworkBehaviour) });
-            addMd.Invoke(dict2, new object[] { typeof(NetworkBehaviour), lsInst });
-        }
-    } 
-#endif
-
-#if NETICK
-    [CustomPropertyDrawer(typeof(NetworkBool))]
-    public class NetworkBoolPropertyDrawer : PropertyDrawer
-    {
-        public override VisualElement CreatePropertyGUI(SerializedProperty property)
-        {
-            var field = new Toggle();
-            field.label = property.displayName;
-            field.RegisterValueChangedCallback(e =>
-            {
-                property.FindPropertyRelative("RawValue").intValue = e.newValue ? 1 : 0;
-            });
-            field.value = property.FindPropertyRelative("RawValue").intValue != 0;
-            EditorEx.ConfigureStyle<Toggle, bool>(field);
-            return field;
-        }
-    } 
+    }
 #endif
 
     [CanEditMultipleObjects]
-    [CustomEditor(typeof(UnityEngine.Object),true)]
-    internal class MyEditor : Editor
+    [CustomEditor(typeof(UnityEngine.Object), true)]
+    public class MyEditor : Editor
     {
         [SerializeField]
         VisualTreeAsset buttonAsset;
 
+        Editor originalEditor;
+
+        VisualElement debugSplitLine;
+
+        private void OnEnable()
+        {
+            var originalEditorType = Entry.GetOriginalEditorType(target.GetType());
+
+            if (originalEditorType != null && originalEditorType != typeof(MyEditor))
+            {
+                originalEditor = CreateEditor(targets, originalEditorType);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (originalEditor)
+            {
+                DestroyImmediate(originalEditor);
+            }
+        }
+
+        protected override void OnHeaderGUI()
+        {
+            if (originalEditor != null)
+            {
+                originalEditor.Call("OnHeaderGUI");
+            }
+            else
+            {
+                base.OnHeaderGUI();
+            }
+        }
+
+        public override void OnInspectorGUI()
+        {
+            if (originalEditor != null)
+            {
+                originalEditor.OnInspectorGUI();
+            }
+            else
+            {
+                base.OnInspectorGUI();
+            }
+        }
+
+        public override void DrawPreview(Rect previewArea)
+        {
+            if (originalEditor != null)
+            {
+                originalEditor.DrawPreview(previewArea);
+            }
+            else
+            {
+                base.DrawPreview(previewArea);
+            }
+        }
+
+        public override string GetInfoString()
+        {
+            if (originalEditor != null)
+            {
+                return originalEditor.GetInfoString();
+            }
+            return base.GetInfoString();
+        }
+
+        public override GUIContent GetPreviewTitle()
+        {
+            if (originalEditor != null)
+            {
+                return originalEditor.GetPreviewTitle();
+            }
+            return base.GetPreviewTitle();
+        }
+
+        public override bool HasPreviewGUI()
+        {
+            if (originalEditor != null)
+            {
+                return originalEditor.HasPreviewGUI();
+            }
+            return base.HasPreviewGUI();
+        }
+
+        public override void OnInteractivePreviewGUI(Rect r, GUIStyle background)
+        {
+            if (originalEditor != null)
+            {
+                originalEditor.OnInteractivePreviewGUI(r, background);
+            }
+            else
+            {
+                base.OnInteractivePreviewGUI(r, background);
+            }
+        }
+
+        public override void OnPreviewGUI(Rect r, GUIStyle background)
+        {
+            if (originalEditor != null)
+            {
+                originalEditor.OnPreviewGUI(r, background);
+            }
+            else
+            {
+                base.OnPreviewGUI(r, background);
+            }
+        }
+
+        public override void OnPreviewSettings()
+        {
+            if (originalEditor != null)
+            {
+                originalEditor.OnPreviewSettings();
+            }
+            else
+            {
+                base.OnPreviewSettings();
+            }
+        }
+
+        public override void ReloadPreviewInstances()
+        {
+            if (originalEditor != null)
+            {
+                originalEditor.ReloadPreviewInstances();
+            }
+            else
+            {
+                base.ReloadPreviewInstances();
+            }
+        }
+
+        public override Texture2D RenderStaticPreview(string assetPath, UnityEngine.Object[] subAssets, int width, int height)
+        {
+            if (originalEditor != null)
+            {
+                return originalEditor.RenderStaticPreview(assetPath, subAssets, width, height);
+            }
+            return base.RenderStaticPreview(assetPath, subAssets, width, height);
+        }
+
+        public override bool RequiresConstantRepaint()
+        {
+            if (originalEditor != null)
+            {
+                return originalEditor.RequiresConstantRepaint();
+            }
+            return base.RequiresConstantRepaint();
+        }
+
+        public override bool UseDefaultMargins()
+        {
+            if (originalEditor != null)
+            {
+                return originalEditor.UseDefaultMargins();
+            }
+            return base.UseDefaultMargins();
+        }
+
+        protected override bool ShouldHideOpenButton()
+        {
+            if (originalEditor != null)
+            {
+                // Use reflection to call protected method
+                var method = originalEditor.GetType().GetMethod("ShouldHideOpenButton", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                if (method != null)
+                {
+                    return (bool)method.Invoke(originalEditor, null);
+                }
+            }
+            return base.ShouldHideOpenButton();
+        }
+
+#if UNITY_6000_0_OR_NEWER
+        public override VisualElement CreatePreview(VisualElement inspectorPreviewWindow)
+        {
+            if (originalEditor != null)
+            {
+                return originalEditor.CreatePreview(inspectorPreviewWindow);
+            }
+            return base.CreatePreview(inspectorPreviewWindow);
+        }
+#endif
+
         public unsafe override VisualElement CreateInspectorGUI()
         {
-            var root = new VisualElement();             
+
+            var root = new VisualElement();
             root.userData = target;
+
             DefaultInspector(root);
 
 #if NETICK
@@ -142,15 +236,21 @@ namespace Cjx.Unity.Netick.Editor
                 {
                     CreateDebugEditor(root);
                 }
-            } 
+            }
 #endif
             AddButtons(root);
+
             Optional(root);
+
             return root;
         }
 
         private void Optional(VisualElement root)
         {
+
+            debugSplitLine = CreateSplitLine();
+            root.Add(debugSplitLine);
+
             var toogle = new Toggle();
             toogle.text = "Debug Mode";
             var label = toogle.Q<Label>();
@@ -158,9 +258,11 @@ namespace Cjx.Unity.Netick.Editor
             label.RemoveFromHierarchy();
             hierarchy.Insert(0, label);
             root.Add(toogle);
-            toogle.RegisterValueChangedCallback(evt => {
+            toogle.RegisterValueChangedCallback(evt =>
+            {
                 if (evt.newValue)
                 {
+                    debugSplitLine.RemoveFromHierarchy();
                     toogle.RemoveFromHierarchy();
                     var search = new TextField();
                     root.Add(CreateSplitLine());
@@ -176,7 +278,7 @@ namespace Cjx.Unity.Netick.Editor
                         typeof(UnityEngine.Component),
                         typeof(UnityEngine.Behaviour)
                     };
-                    foreach(var md in target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Instance).Where(x=>!except.Contains(x.DeclaringType)))
+                    foreach (var md in target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Instance).Where(x => !except.Contains(x.DeclaringType)))
                     {
                         if (md.Name.StartsWith("get_"))
                         {
@@ -193,8 +295,10 @@ namespace Cjx.Unity.Netick.Editor
                         try
                         {
                             var item = CreateFunctionItem(targets, md, buttonAsset);
-                            var cmm = new ContextualMenuManipulator(e => {
-                                e.menu.AppendAction("Pin To Quick Debug Window", a => {
+                            var cmm = new ContextualMenuManipulator(e =>
+                            {
+                                e.menu.AppendAction("Pin To Quick Debug Window", a =>
+                                {
                                     var w = EditorWindow.GetWindow<QuickDebugWindow>();
                                     var item = CreateFunctionItem(targets, md, buttonAsset);
                                     w.rootVisualElement.Add(item);
@@ -209,8 +313,9 @@ namespace Cjx.Unity.Netick.Editor
                             Debug.LogException(ex);
                         }
                     }
-                    search.RegisterValueChangedCallback(evt => { 
-                        foreach(var pair in dict)
+                    search.RegisterValueChangedCallback(evt =>
+                    {
+                        foreach (var pair in dict)
                         {
                             if (string.IsNullOrEmpty(pair.Key))
                             {
@@ -220,7 +325,7 @@ namespace Cjx.Unity.Netick.Editor
                             {
                                 pair.Value.style.display = !pair.Key.Contains(evt.newValue, StringComparison.OrdinalIgnoreCase) ? new StyleEnum<DisplayStyle>(DisplayStyle.None) : new StyleEnum<DisplayStyle>(DisplayStyle.Flex);
                             }
-      
+
                         }
                     });
                 }
@@ -231,7 +336,7 @@ namespace Cjx.Unity.Netick.Editor
         {
             var methods = target.GetType()
                 .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
-                .Where(x=>x.CustomAttributes.Any(x=>x.AttributeType.Name == "ButtonAttribute"));
+                .Where(x => x.CustomAttributes.Any(x => x.AttributeType.Name == "ButtonAttribute"));
 
             if (methods.Any())
             {
@@ -246,7 +351,7 @@ namespace Cjx.Unity.Netick.Editor
             }
         }
 
-        public static VisualElement CreateFunctionItem(object target, MethodInfo method , VisualTreeAsset buttonAsset)
+        public static VisualElement CreateFunctionItem(object target, MethodInfo method, VisualTreeAsset buttonAsset)
         {
             var item = buttonAsset.Instantiate();
             var btn = item.Q<Button>();
@@ -254,7 +359,8 @@ namespace Cjx.Unity.Netick.Editor
             btn.text = ">";
             object[] args = method.GetParameters().Select(x => x.DefaultValue).ToArray();
 
-            btn.clicked += () => {
+            btn.clicked += () =>
+            {
                 method.Invoke(method.IsStatic ? null : target, args);
             };
 
@@ -288,7 +394,8 @@ namespace Cjx.Unity.Netick.Editor
             btn.text = ">";
             object[] args = method.GetParameters().Select(x => x.DefaultValue).ToArray();
 
-            btn.clicked += () => {
+            btn.clicked += () =>
+            {
                 foreach (var target in targets)
                 {
                     method.Invoke(method.IsStatic ? null : target, args);
@@ -323,42 +430,87 @@ namespace Cjx.Unity.Netick.Editor
 
         private void DefaultInspector(VisualElement root)
         {
-            var defaultInspector = new VisualElement();
-            InspectorElement.FillDefaultInspector(defaultInspector, this.serializedObject, this);
 
-            var defaultContent = CreateFoldOut("Default");
-            bool isFirstItem = true;
-            foreach(var item in defaultInspector.Children().ToArray())
+#if NETICK
+            if(targets[0] is NetworkBehaviour)
             {
-                if (isFirstItem)
+                // default
+                if(originalEditor is NetworkBehaviourEditor)
                 {
-                    isFirstItem = false;
-                    root.Add(item);
-                    continue;
+                    var defaultInspector = new VisualElement();
+                    var defaultContentFoldOut = CreateFoldOut("Default");
+                    InspectorElement.FillDefaultInspector(defaultInspector, this.serializedObject, this);
+                    bool isFirstItem = true;
+                    foreach (var item in defaultInspector.Children().ToArray())
+                    {
+                        if (isFirstItem)
+                        {
+                            isFirstItem = false;
+                            root.Add(item);
+                            continue;
+                        }
+                        else
+                        {
+                            defaultContentFoldOut.Add(item);
+                        }
+                    }
+                    if (defaultContentFoldOut.childCount > 0)
+                    {
+                        root.Add(CreateSplitLine());
+                        root.Add(defaultContentFoldOut);
+                    }
                 }
+                // has custom editor
                 else
                 {
-                    defaultContent.Add(item);
+                    AddOriginalEditor(root);
+                }
+
+                AddNetworkProperties(root);
+
+                return;
+            }
+#endif
+
+            if(originalEditor == null)
+            {
+                var defaultContentFoldOut = CreateFoldOut("Default");
+                InspectorElement.FillDefaultInspector(defaultContentFoldOut, this.serializedObject, this);
+                if (defaultContentFoldOut.childCount > 0)
+                {
+                    root.Add(CreateSplitLine());
+                    root.Add(defaultContentFoldOut);
                 }
             }
-            if (defaultContent.childCount > 0)
+            else
             {
-                root.Add(CreateSplitLine());
-                root.Add(defaultContent);
+                AddOriginalEditor(root);
             }
 
-            AddNetworkProperties(root);
+        }
+
+        private void AddOriginalEditor(VisualElement root)
+        {
+            var defaultInsector = CreateFoldOut("Default");
+            var d = originalEditor.CreateInspectorGUI() ?? new IMGUIContainer(
+                () => {
+                    ReflectionEx.SetStaticField<EditorGUI>("s_FoldoutHeaderGroupActive",0);// fix unity bug
+                    originalEditor.OnInspectorGUI();
+                }
+                );
+            defaultInsector.Add(d);
+            root.Add(defaultInsector);
         }
 
         private void AddNetworkProperties(VisualElement root)
         {
 #if NETICK
-            if(target is not NetworkBehaviour)
+            if (targets[0] is not NetworkBehaviour)
             {
                 return;
             }
             var networkProperties = CreateFoldOut("Network Properties");
-            var serializedObject = new SerializedObject(target);
+            var serializedObject = new SerializedObject(targets);
             serializedObject.forceChildVisibility = true;
             SerializedProperty iterator = serializedObject.GetIterator();
             if (iterator.NextVisible(enterChildren: true))
@@ -391,11 +543,23 @@ namespace Cjx.Unity.Netick.Editor
                 }
                 while (iterator.Next(enterChildren: false));
             }
-            if (networkProperties.childCount > 0)
+            if (networkProperties.contentContainer.childCount > 0)
             {
                 root.Add(CreateSplitLine());
                 root.Add(networkProperties);
-            } 
+            }
+#endif
+        }
+
+        private void CreateDebugEditor(VisualElement root)
+        {
+#if NETICK
+            root.Add(CreateSplitLine());
+            var netRole = ((NetworkBehaviour)target).IsServer ? "Server" : "Client";
+            var foldOut = CreateFoldOut($"Network State (Runtime) ({netRole})");
+            var content = EditorEx.Configure(target.GetType(), () => target, null, target is NetworkBehaviour nb && nb.IsServer);
+            foldOut.Add(content);
+            root.Add(foldOut);
 #endif
         }
 
@@ -434,18 +598,6 @@ namespace Cjx.Unity.Netick.Editor
             splitLine.style.height = new StyleLength(1f);
             return splitLine;
         }
-
-        private unsafe void CreateDebugEditor(VisualElement root)
-        {
-#if NETICK
-            root.Add(CreateSplitLine());
-            var netRole = ((NetworkBehaviour)target).IsServer ? "Server" : "Client";
-            var foldOut = CreateFoldOut($"Network State (Runtime) ({netRole})");
-            var content = EditorEx.Configure(target.GetType(), () => target, null, target is NetworkBehaviour nb && nb.IsServer);
-            foldOut.Add(content);
-            root.Add(foldOut); 
-#endif
-        }
     }
 
     internal static class EditorEx
@@ -475,7 +627,7 @@ namespace Cjx.Unity.Netick.Editor
 
             foreach (var prop in type.GetProperties(All).Where(x => x.DeclaringType == type && x.CustomAttributes.Any(x => x.AttributeType == typeof(Networked))))
             {
-                Action<object> set = !writable ||prop.SetMethod == null ? null : val =>
+                Action<object> set = !writable || prop.SetMethod == null ? null : val =>
                 {
                     prop.SetValue(source, val);
                     targetSet?.Invoke(source);
@@ -497,9 +649,9 @@ namespace Cjx.Unity.Netick.Editor
                 }
             }
             else
-            { 
+            {
 #endif
-            foreach (var field in type.GetFields(All))
+                foreach (var field in type.GetFields(All))
                 {
                     Action<object> set = !writable || (type.IsValueType && targetSet == null) ? null : val =>
                     {
@@ -510,7 +662,7 @@ namespace Cjx.Unity.Netick.Editor
                     AddDisplayItem(root, field.Name, field.FieldType, () => field.GetValue(source), set);
                 }
 #if NETICK
-        }  
+            }
 #endif
             return root;
         }
@@ -532,7 +684,8 @@ namespace Cjx.Unity.Netick.Editor
             fd.schedule.Execute(() =>
             {
                 execChangeEvent = false;
-                if (getValue() is TValue v) {
+                if (getValue() is TValue v)
+                {
                     fd.value = v;
                 }
                 execChangeEvent = true;
@@ -604,24 +757,24 @@ namespace Cjx.Unity.Netick.Editor
                 {
                     ConfigureField<FloatField, float>(root, name, getValue, setValue);
 
-/*                    ConfigureField<TextField, string>(root, name, () => {
-                        float value = (float)getValue();
-                        ref uint raw = ref UnsafeUtility.As<float, uint>(ref value);
-                        StringBuilder sb = new StringBuilder();
-                        for (int i = 31; i >= 0; i--)
-                        {
-                            var mask = 1u << i;
-                            if ((raw & mask) != 0)
-                            {
-                                sb.Append('1');
-                            }
-                            else
-                            {
-                                sb.Append('0');
-                            }
-                        }
-                        return sb.ToString();
-                    }, null);*/
+                    /*                    ConfigureField<TextField, string>(root, name, () => {
+                                            float value = (float)getValue();
+                                            ref uint raw = ref UnsafeUtility.As<float, uint>(ref value);
+                                            StringBuilder sb = new StringBuilder();
+                                            for (int i = 31; i >= 0; i--)
+                                            {
+                                                var mask = 1u << i;
+                                                if ((raw & mask) != 0)
+                                                {
+                                                    sb.Append('1');
+                                                }
+                                                else
+                                                {
+                                                    sb.Append('0');
+                                                }
+                                            }
+                                            return sb.ToString();
+                                        }, null);*/
 
                 }
                 else if (type == typeof(double))
@@ -672,7 +825,7 @@ namespace Cjx.Unity.Netick.Editor
                 else if (type == typeof(NetworkBool))
                 {
                     ConfigureField<Toggle, bool>(root, name, () => (bool)(NetworkBool)getValue(), setValue == null ? null : val => setValue((bool)(NetworkBool)val));
-                } 
+                }
 #endif
                 else if (type == typeof(Quaternion))
                 {
@@ -715,7 +868,7 @@ namespace Cjx.Unity.Netick.Editor
                     foldOut.text = name;
                     foldOut.Add(content);
                     root.Add(foldOut);
-                    if(setValue == null)
+                    if (setValue == null)
                     {
                         foldOut.Q<Label>().style.color = Color.grey;
                     }
@@ -746,7 +899,8 @@ namespace Cjx.Unity.Netick.Editor
                         v.Clear();
                     };
                     ls.virtualizationMethod = CollectionVirtualizationMethod.DynamicHeight;
-                    ls.schedule.Execute(() => {
+                    ls.schedule.Execute(() =>
+                    {
                         source.Clear();
                         var buffer = getValue();
                         for (int i = 0; i < fields.Length; i++)
@@ -761,10 +915,6 @@ namespace Cjx.Unity.Netick.Editor
                     var scroll = new ScrollView();
                     scroll.Add(ls);
                     foldOut.Add(scroll);
-                    if (setValue == null)
-                    {
-                        foldOut.Q<Label>().style.color = Color.grey;
-                    }
                     root.Add(foldOut);
                     scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
                     scroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
@@ -824,14 +974,14 @@ namespace Cjx.Unity.Netick.Editor
                         field.objectType = typeof(NetworkObject);
                         field.SetEnabled(setValue != null);
                         name += " (Raw)";
-                    } 
+                    }
 #endif
                     var content = Configure(type, getValue, setValue, setValue != null);
                     bool needFoldOut = true;
                     if (type.IsConstructedGenericType && typeof(KeyValuePair<,>) == type.GetGenericTypeDefinition())
                     {
                         content.style.flexDirection = new StyleEnum<FlexDirection>(FlexDirection.Row);
-                        foreach(var child in content.Children())
+                        foreach (var child in content.Children())
                         {
                             child.style.flexGrow = 1;
                         }
@@ -893,7 +1043,7 @@ namespace Cjx.Unity.Netick.Editor
                         source.Clear();
                         var buffer = (getValue() as IEnumerable)?.GetEnumerator();
 
-                        if(buffer == null)
+                        if (buffer == null)
                         {
                             return;
                         }
@@ -919,21 +1069,19 @@ namespace Cjx.Unity.Netick.Editor
                     scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
                     scroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
                     scroll.style.maxHeight = new StyleLength(240);
-/*                    var methodsToExpose = new[] {
-                        "Add","Remove","Enqueue","Dequeue","Push","Pop","Clear"
-                    };
+                    /*                    var methodsToExpose = new[] {
+                                            "Add","Remove","Enqueue","Dequeue","Push","Pop","Clear"
+                                        };
 
-                    foreach (var method in methodsToExpose)
-                    {
-                        if (type.GetMethods().FirstOrDefault(x => x.Name == method) is MethodInfo addMd)
-                        {
-                            foldOut.Add(MyEditor.AddFunction(getValue(), addMd));
-                        }
-                    }*/
+                                        foreach (var method in methodsToExpose)
+                                        {
+                                            if (type.GetMethods().FirstOrDefault(x => x.Name == method) is MethodInfo addMd)
+                                            {
+                                                foldOut.Add(MyEditor.AddFunction(getValue(), addMd));
+                                            }
+                                        }*/
                 }
             }
         }
-
     }
-
 }

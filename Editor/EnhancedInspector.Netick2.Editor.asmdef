@@ -12,7 +12,9 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "Netick.dll",
-        "Netick.Unity.dll"
+        "Netick.Unity.dll",
+        "Netick.Unity.Editor.dll",
+        "Sirenix.OdinInspector.Editor.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],

@@ -1,3 +1,8 @@
 using System;
 
-public class ButtonAttribute : Attribute { }
+namespace Cjx
+{
+
+    public class ButtonAttribute : Attribute { }
+
+}
