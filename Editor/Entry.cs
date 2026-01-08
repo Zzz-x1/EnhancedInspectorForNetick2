@@ -193,13 +193,6 @@ namespace Cjx.Unity.Netick.Editor
                     }
                 }
             }
-            
-            var rebuildMethod = instance.GetType().GetMethod("Rebuild", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            if (rebuildMethod != null)
-            {
-                rebuildMethod.Invoke(instance, null);
-                Debug.Log("[MyEditor] Rebuilt Unity 6.x custom editor cache");
-            }
 #else
             var customEditorAttributesType = typeof(Editor).Assembly.GetType("UnityEditor.CustomEditorAttributes");
             var dictField = customEditorAttributesType.GetField("kSCustomEditors", BindingFlags.Static | BindingFlags.NonPublic);
@@ -408,9 +401,8 @@ namespace Cjx.Unity.Netick.Editor
             var m_IsFallbackField = monoEditorType.GetField("m_IsFallback", bindingFlags);
             var monoEditorTypeInst = Activator.CreateInstance(monoEditorType);
 
-            m_InspectedTypeField.SetValue(monoEditorTypeInst, typeof(MonoBehaviour));
+            m_InspectedTypeField.SetValue(monoEditorTypeInst, typeof(UnityEngine.Object));
             m_InspectorTypeField.SetValue(monoEditorTypeInst, typeof(MyEditor));
-            //m_RenderPipelineTypeField.SetValue(monoEditorTypeInst, GraphicsSettings.defaultRenderPipeline.GetType());
             m_EditorForChildClassesField.SetValue(monoEditorTypeInst, true);
             m_IsFallbackField.SetValue(monoEditorTypeInst, false);
 
@@ -421,8 +413,8 @@ namespace Cjx.Unity.Netick.Editor
 
             var removeMd = dictField.FieldType.GetMethods().FirstOrDefault(x => x.Name == "Remove" && x.GetParameters().Length == 1);
 
-            removeMd.Invoke(dict, new[] { typeof(MonoBehaviour) });
-            addMd.Invoke(dict, new object[] { typeof(MonoBehaviour), lsInst });
+            removeMd.Invoke(dict, new[] { typeof(UnityEngine.Object) });
+            addMd.Invoke(dict, new object[] { typeof(UnityEngine.Object), lsInst });//
         }
     }
 }

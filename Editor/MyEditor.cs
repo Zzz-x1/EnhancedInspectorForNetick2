@@ -30,7 +30,6 @@ namespace Cjx.Unity.Netick.Editor
 #endif
 
     [CanEditMultipleObjects]
-    [CustomEditor(typeof(UnityEngine.Object), true)]
     public class MyEditor : Editor
     {
         [SerializeField]
