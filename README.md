@@ -7,8 +7,8 @@
 - Select Add package from git URL
 - Enter ```https://github.com/Zzz-x1/EnhancedInspectorForNetick2.git```
 ### Features
-- View network state and modify network properties via inspector
-- Compatible with custom property drawer
+- View runtime network properties and network collections and modify network properties via inspector
+- Compatible with custom property drawer , custom editor , third-party editor plugin (odin , naughty attributes etc..)
 - ButtonAttribute for any method(support arguments)
 ### Preview
 - Inspector
