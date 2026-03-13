@@ -41,6 +41,7 @@ namespace Cjx.Unity.Netick.Editor
 
         private void OnEnable()
         {
+            buttonAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(AssetDatabase.GUIDToAssetPath("39b11cababfc26c469f4bc254a64d4b7"));
             var originalEditorType = Entry.GetOriginalEditorType(target.GetType());
 
             if (originalEditorType != null && originalEditorType != typeof(MyEditor))
@@ -493,7 +494,11 @@ namespace Cjx.Unity.Netick.Editor
             var defaultInsector = CreateFoldOut("Default");
             var d = originalEditor.CreateInspectorGUI() ?? new IMGUIContainer(
                 () => {
+#if UNITY_2022_3_OR_NEWER
                     ReflectionEx.SetStaticField<EditorGUI>("s_FoldoutHeaderGroupActive",0);// fix unity bug
+#else
+                    ReflectionEx.SetStaticField<EditorGUI>("s_FoldoutHeaderGroupActive", false);
+#endif
                     originalEditor.OnInspectorGUI();
                 }
                 );
