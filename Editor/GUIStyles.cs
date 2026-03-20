@@ -29,7 +29,7 @@ namespace Netick.Unity.Editor.Addon
 
     internal static class GUIContents
     {
-        public static readonly string logoPath = AssetDatabase.GUIDToAssetPath("52175d3899aefcc46bfd74f73d975da8"); // path to logo texture
+        public static readonly string logoPath = AssetDatabase.GUIDToAssetPath("0170f1b3d9b4ffe4fbd79ae4c7533f99"); // path to logo texture
         public static readonly GUIContent syncWithOn = Icons.GetContentWithText(logoPath, "<color=#29abe2>Sync with </color>"); // text color matches Logo.Icon color
         public static readonly GUIContent syncWithOff = Icons.GetContentWithText(logoPath, "<color=#868686>Sync with </color>"); // text color matches Logo.Icon.Disabled color
         public static readonly GUIContent netickBanner = Icons.GetContent(logoPath);
