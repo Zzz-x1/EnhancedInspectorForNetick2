@@ -398,7 +398,14 @@ namespace Cjx.Unity.Netick.Editor
             {
                 foreach (var target in targets)
                 {
-                    method.Invoke(method.IsStatic ? null : target, args);
+                    try
+                    {
+                        method.Invoke(method.IsStatic ? null : target, args);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogException(ex);
+                    }
                 }
             };
 
